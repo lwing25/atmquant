@@ -1,0 +1,193 @@
+---
+globs: *.py
+---
+
+# ATMQuant代码规范
+
+## 基本代码风格
+
+- 使用Python 3.10+
+- 遵循PEP 8代码规范
+- 使用类型注解
+- 添加详细的中文注释
+
+## 文件头规范
+
+所有Python文件应包含以下文件头：
+
+```python
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+文件描述
+简要说明文件的功能和作用
+"""
+```
+
+## 导入规范
+
+导入模块时遵循以下顺序：
+1. 标准库导入
+2. 第三方库导入
+3. 本地应用/库特定导入
+
+示例：
+```python
+# 标准库
+import os
+import sys
+from datetime import datetime, timedelta
+
+# 第三方库
+import numpy as np
+import pandas as pd
+from loguru import logger
+
+# 本地应用
+from core.data import DataProcessor
+from utils.helpers import format_date
+```
+
+## 命名规范
+
+- **类名**：使用驼峰命名法（CamelCase）
+- **函数名和变量名**：使用小写字母和下划线（snake_case）
+- **常量**：使用大写字母和下划线
+- **私有方法和属性**：使用单下划线前缀
+
+示例：
+```python
+# 常量
+MAX_RETRY_COUNT = 3
+DEFAULT_TIMEOUT = 30
+
+# 类
+class DataProcessor:
+    def __init__(self):
+        self._cache = {}  # 私有属性
+    
+    def process_data(self, data):
+        # 处理数据
+        pass
+    
+    def _validate_input(self, data):
+        # 私有方法
+        pass
+```
+
+## 注释规范
+
+- 使用中文注释，保持清晰简洁
+- 每个函数都应有文档字符串，说明功能、参数和返回值
+- 复杂的代码块应有注释说明
+
+示例：
+```python
+def calculate_ma(prices: list[float], period: int) -> list[float]:
+    """
+    计算移动平均线
+    
+    Args:
+        prices: 价格序列
+        period: 周期
+    
+    Returns:
+        移动平均线序列
+    """
+    if not prices or period <= 0:
+        return []
+    
+    result = []
+    for i in range(len(prices)):
+        if i < period - 1:
+            result.append(0)
+        else:
+            # 计算移动平均
+            ma = sum(prices[i-period+1:i+1]) / period
+            result.append(ma)
+    
+    return result
+```
+
+## 错误处理
+
+- 使用异常处理而非返回错误码
+- 捕获具体的异常类型，避免捕获所有异常
+- 提供有用的错误信息
+
+示例：
+```python
+def load_config(file_path: str) -> dict:
+    """加载配置文件"""
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except FileNotFoundError:
+        logger.error(f"配置文件不存在: {file_path}")
+        raise
+    except json.JSONDecodeError as e:
+        logger.error(f"配置文件格式错误: {e}")
+        raise
+```
+
+## 类型注解
+
+- 使用类型注解提高代码可读性和IDE支持
+- 复杂类型使用typing模块
+- 返回值类型也需注明
+
+示例：
+```python
+from typing import Dict, List, Optional, Union, Tuple
+
+def process_data(data: List[Dict[str, float]], 
+                 threshold: Optional[float] = None) -> Tuple[List[float], int]:
+    """处理数据并返回结果"""
+    result = []
+    count = 0
+    
+    for item in data:
+        value = item.get('value', 0)
+        if threshold is None or value > threshold:
+            result.append(value)
+            count += 1
+    
+    return result, count
+```
+
+## 代码组织
+
+- 相关的功能应组织在同一个模块中
+- 避免循环导入
+- 保持函数和类的单一职责
+- 大型类可以拆分为多个混入类（Mixin）
+
+## 日志规范
+
+- 使用loguru进行日志记录
+- 适当选择日志级别
+- 包含足够的上下文信息
+
+示例：
+```python
+from loguru import logger
+
+def process_order(order_id: str, amount: float) -> bool:
+    logger.info(f"开始处理订单: {order_id}, 金额: {amount}")
+    
+    try:
+        # 处理订单
+        result = do_process(order_id, amount)
+        logger.success(f"订单处理成功: {order_id}")
+        return result
+    except Exception as e:
+        logger.error(f"订单处理失败: {order_id}, 错误: {e}")
+        return False
+```
+
+## 测试规范
+
+- 编写单元测试覆盖核心功能
+- 使用pytest框架
+- 测试文件命名为test_*.py
+- 包含正向测试和边界条件测试

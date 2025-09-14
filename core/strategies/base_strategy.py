@@ -1,0 +1,71 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+ATMQuant基础策略类
+基于vnpy CtaTemplate扩展，添加日志和告警功能
+"""
+
+from vnpy_ctastrategy import CtaTemplate
+from core.logging.logger_manager import get_logger
+from core.logging.alert_manager import alert_manager
+
+
+class BaseCtaStrategy(CtaTemplate):
+    """ATMQuant基础策略类"""
+    
+    def __init__(self, cta_engine, strategy_name, vt_symbol, setting):
+        """初始化策略"""
+        super().__init__(cta_engine, strategy_name, vt_symbol, setting)
+        
+        # 初始化日志系统
+        self.logger = get_logger(symbol=self.vt_symbol.split('.')[0])
+        
+        # 策略状态
+        self.strategy_status = "未启动"
+        
+    def on_init(self):
+        """策略初始化"""
+        self.strategy_status = "初始化中"
+        self.logger.info(f"策略 {self.strategy_name} 开始初始化")
+        super().on_init()
+        
+    def on_start(self):
+        """策略启动"""
+        self.strategy_status = "运行中"
+        self.logger.success(f"策略 {self.strategy_name} 启动成功")
+        super().on_start()
+        
+    def on_stop(self):
+        """策略停止"""
+        self.strategy_status = "已停止"
+        self.logger.info(f"策略 {self.strategy_name} 已停止")
+        super().on_stop()
+        
+    def on_trade(self, trade):
+        """成交回报"""
+        self.logger.success(
+            f"成交回报: {trade.direction} {trade.volume}@{trade.price} "
+            f"成交金额: {trade.price * trade.volume}"
+        )
+        super().on_trade(trade)
+        
+    def on_order(self, order):
+        """委托回报"""
+        if order.status == "全部成交":
+            self.logger.info(f"委托全部成交: {order.direction} {order.volume}@{order.price}")
+        elif order.status == "部分成交":
+            self.logger.info(f"委托部分成交: {order.direction} {order.volume}@{order.price}")
+        elif order.status == "已撤销":
+            self.logger.warning(f"委托已撤销: {order.direction} {order.volume}@{order.price}")
+        super().on_order(order)
+        
+    def send_alert(self, message: str, level: str = "INFO"):
+        """发送告警消息"""
+        try:
+            alert_manager.send_alert(
+                content=f"📊 策略告警\n策略：{self.strategy_name}\n品种：{self.vt_symbol}\n消息：{message}",
+                symbol=self.vt_symbol,
+                alert_type="feishu"
+            )
+        except Exception as e:
+            self.logger.error(f"发送告警失败: {e}")

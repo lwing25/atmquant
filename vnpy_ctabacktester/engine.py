@@ -86,12 +86,18 @@ class BacktesterEngine(BaseEngine):
         """
         Load strategy class from source code.
         """
+        # 加载vnpy自带策略
         app_path: Path = Path(vnpy_ctastrategy.__file__).parent
         path1: Path = app_path.joinpath("strategies")
         self.load_strategy_class_from_folder(path1, "vnpy_ctastrategy.strategies")
 
+        # 加载当前目录下的策略
         path2: Path = Path.cwd().joinpath("strategies")
         self.load_strategy_class_from_folder(path2, "strategies")
+        
+        # 加载ATMQuant自定义策略
+        path3: Path = Path(__file__).parent.parent.joinpath("core", "strategies")
+        self.load_strategy_class_from_folder(path3, "core.strategies")
 
     def load_strategy_class_from_folder(self, path: Path, module_name: str = "") -> None:
         """
