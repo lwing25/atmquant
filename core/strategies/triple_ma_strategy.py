@@ -23,19 +23,19 @@ class TripleMaStrategy(BaseCtaStrategy):
     """三均线策略"""
     
     # 策略参数
-    short_window = 5      # 短期均线周期
-    mid_window = 20       # 中期均线周期  
-    long_window = 60      # 长期均线周期
+    short_window = 7      # 短期均线周期
+    mid_window = 55       # 中期均线周期  
+    long_window = 100      # 长期均线周期
     ma_type = "SMA"       # 均线类型：SMA或EMA
     
     # 多时间周期参数
-    signal_timeframe = 15  # 信号时间周期（分钟）
+    signal_timeframe = 5  # 信号时间周期（分钟）
     trade_timeframe = 5    # 交易时间周期（分钟）
     
     # 止盈止损参数
     stop_loss_pct = 2.0   # 止损百分比
     take_profit_pct = 4.0 # 止盈百分比
-    trailing_stop_pct = 1.0  # 跟踪止损百分比
+    trailing_stop_pct = 0.5  # 跟踪止损百分比
     
     # 策略变量
     short_ma = 0.0

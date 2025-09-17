@@ -59,6 +59,7 @@ globs: **/articles/*.md
 [总结和感悟]
 
 ---
+**本文是《以AI量化为生》系列文章的第八篇，完整代码已开源至GitHub：https://github.com/seasonstar/atmquant**
 
 *本文内容仅供学习交流，不构成任何投资建议。交易有风险，投资需谨慎。*
 ```

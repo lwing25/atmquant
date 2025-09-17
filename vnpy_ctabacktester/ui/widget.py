@@ -185,7 +185,12 @@ class BacktesterManager(QtWidgets.QWidget):
         left_vbox.addWidget(reload_button)
 
         # Result part
-        self.statistics_monitor: StatisticsMonitor = StatisticsMonitor()
+        # 使用增强的统计监控器
+        try:
+            from .enhanced_widget import EnhancedStatisticsMonitor
+            self.statistics_monitor = EnhancedStatisticsMonitor()
+        except ImportError:
+            self.statistics_monitor: StatisticsMonitor = StatisticsMonitor()
 
         self.log_monitor: QtWidgets.QTextEdit = QtWidgets.QTextEdit()
 
@@ -464,10 +469,15 @@ class BacktesterManager(QtWidgets.QWidget):
         """"""
         result_values: list = self.backtester_engine.get_result_values()
 
-        dialog: OptimizationResultMonitor = OptimizationResultMonitor(
-            result_values,
-            self.target_display
-        )
+        # 使用增强的优化结果监控器
+        try:
+            from .enhanced_widget import EnhancedOptimizationResultMonitor
+            dialog = EnhancedOptimizationResultMonitor(result_values, self.target_display)
+        except ImportError:
+            dialog: OptimizationResultMonitor = OptimizationResultMonitor(
+                result_values,
+                self.target_display
+            )
         dialog.exec_()
 
     def show_backtesting_trades(self) -> None:

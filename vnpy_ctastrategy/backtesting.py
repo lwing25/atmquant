@@ -288,6 +288,11 @@ class BacktestingEngine:
         if results:
             self.daily_df = DataFrame.from_dict(results).set_index("date")
 
+        # Generate trade pairs for enhanced statistics
+        from .enhanced_backtesting import generate_trade_pairs
+        sorted_trades = sorted(self.trades.values(), key=lambda x: x.datetime)
+        self.trade_pairs = generate_trade_pairs(sorted_trades)
+
         self.output(_("逐日盯市盈亏计算完成"))
         return self.daily_df
 
@@ -445,13 +450,67 @@ class BacktestingEngine:
             self.output(_("日均手续费：\t{:,.2f}").format(daily_commission))
             self.output(_("日均滑点：\t{:,.2f}").format(daily_slippage))
             self.output(_("日均成交金额：\t{:,.2f}").format(daily_turnover))
-            self.output(_("日均成交笔数：\t{}").format(daily_trade_count))
+            self.output(_("日均成交笔数：\t{:.2f}").format(daily_trade_count))
 
             self.output(_("日均收益率：\t{:,.2f}%").format(daily_return))
             self.output(_("收益标准差：\t{:,.2f}%").format(return_std))
             self.output(f"Sharpe Ratio：\t{sharpe_ratio:,.2f}")
             self.output(f"EWM Sharpe：\t{ewm_sharpe:,.2f}")
             self.output(_("收益回撤比：\t{:,.2f}").format(return_drawdown_ratio))
+
+        # Calculate enhanced trade statistics
+        from .enhanced_backtesting import (
+            calculate_trade_statistics,
+            calculate_advanced_metrics,
+            calculate_monthly_statistics,
+            calculate_interval_statistics,
+            calculate_comprehensive_rating
+        )
+
+        trade_statistics = {}
+        monthly_statistics = DataFrame()
+        interval_statistics = DataFrame()
+        advanced_metrics = {}
+
+        if hasattr(self, 'trade_pairs') and self.trade_pairs:
+            trade_statistics = calculate_trade_statistics(self.trade_pairs, self.size)
+            monthly_statistics = calculate_monthly_statistics(self.trade_pairs, self.size)
+            interval_statistics = calculate_interval_statistics(self.trade_pairs, self.size)
+
+        if positive_balance and not df.empty:
+            advanced_metrics = calculate_advanced_metrics(df, self.capital, self.risk_free, self.annual_days)
+
+        # Output enhanced statistics
+        if output and trade_statistics:
+            self.output("-" * 30)
+            self.output(_("增强交易统计指标"))
+            self.output(_("胜率: \t{:.2%}").format(trade_statistics.get("win_rate", 0)))
+            self.output(_("盈亏比: \t{:.2f}").format(trade_statistics.get("average_win_loss_ratio", 0)))
+            self.output(_("获利因子: \t{:.2f}").format(trade_statistics.get("profit_factor", 0)))
+            self.output(_("平均每笔交易盈亏: \t{:.2f}").format(trade_statistics.get("average_trade", 0)))
+            self.output(_("最大连续盈利次数: \t{}").format(trade_statistics.get("max_consecutive_wins", 0)))
+            self.output(_("最大连续亏损次数: \t{}").format(trade_statistics.get("max_consecutive_losses", 0)))
+            self.output(_("最优仓位比例: \t{:.2%}").format(trade_statistics.get("optimal_position_ratio", 0)))
+            self.output(_("平均持仓时间: \t{:.2f}天").format(trade_statistics.get("average_holding_time_days", 0)))
+            self.output(_("最大持仓时间: \t{:.2f}天").format(trade_statistics.get("max_holding_time_days", 0)))
+            self.output(_("最小持仓时间: \t{:.2f}天").format(trade_statistics.get("min_holding_time_days", 0)))
+            self.output(_("中位数持仓时间: \t{:.2f}天").format(trade_statistics.get("median_holding_time_days", 0)))
+
+        if output and advanced_metrics:
+            self.output(_("索提诺比率：\t{:.2f}").format(advanced_metrics.get("sortino_ratio", 0)))
+            self.output(_("卡尔马比率：\t{:.2f}").format(advanced_metrics.get("calmar_ratio", 0)))
+
+        # 输出月度统计数据
+        if output and not monthly_statistics.empty:
+            self.output("-" * 30)
+            self.output(_("月度统计数据"))
+            self.output(monthly_statistics.to_string(index=False))
+
+        # 输出半小时区间统计数据
+        if output and not interval_statistics.empty:
+            self.output("-" * 30)
+            self.output(_("半小时区间统计数据"))
+            self.output(interval_statistics.to_string(index=False))
 
         statistics: dict = {
             "start_date": start_date,
@@ -481,13 +540,30 @@ class BacktestingEngine:
             "sharpe_ratio": sharpe_ratio,
             "ewm_sharpe": ewm_sharpe,
             "return_drawdown_ratio": return_drawdown_ratio,
+            # Enhanced trade statistics
+            **trade_statistics,
+            # Advanced risk metrics
+            **advanced_metrics,
+            # Additional data for UI display
+            "monthly_statistics": monthly_statistics.to_string(index=False) if not monthly_statistics.empty else "",
+            "interval_statistics": interval_statistics.to_string(index=False) if not interval_statistics.empty else "",
         }
+
+        # Calculate comprehensive rating
+        statistics["overall_rating"] = calculate_comprehensive_rating(statistics)
 
         # Filter potential error infinite value
         for key, value in statistics.items():
             if value in (np.inf, -np.inf):
                 value = 0
-            statistics[key] = np.nan_to_num(value)
+            # 对于连续盈亏次数，保持整数类型
+            if key in ["max_consecutive_wins", "max_consecutive_losses"]:
+                if isinstance(value, (int, float)) and not np.isnan(value):
+                    statistics[key] = int(value)
+                else:
+                    statistics[key] = 0
+            else:
+                statistics[key] = np.nan_to_num(value)
 
         self.output(_("策略统计指标计算完成"))
         return statistics
@@ -1158,7 +1234,7 @@ def evaluate(
     engine.load_data()
     engine.run_backtesting()
     engine.calculate_result()
-    statistics: dict = engine.calculate_statistics(output=False)
+    statistics: dict = engine.calculate_statistics(output=True)
 
     target_value: float = statistics.get(target_name, 0)
     return (setting, target_value, statistics)

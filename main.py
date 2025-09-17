@@ -58,8 +58,8 @@ def main():
         main_engine.add_app(CtaStrategyApp)
         print("✓ CTA策略引擎加载成功")
         
-        main_engine.add_app(DataManagerApp)
-        print("✓ 数据管理模块加载成功")
+        #main_engine.add_app(DataManagerApp)
+        #print("✓ 数据管理模块加载成功")
         
         main_engine.add_app(CtaBacktesterApp)
         print("✓ 回测引擎加载成功")
