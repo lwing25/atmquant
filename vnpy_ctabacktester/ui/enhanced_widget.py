@@ -608,8 +608,28 @@ class EnhancedOptimizationResultMonitor(QtWidgets.QDialog):
 
     def export_csv(self):
         """导出CSV文件"""
+        import os
+        from datetime import datetime
+        
+        # 获取当前项目的绝对目录
+        # 当前文件路径: /path/to/atmquant/vnpy_ctabacktester/ui/enhanced_widget.py
+        # 需要向上2级到达项目根目录: /path/to/atmquant/
+        current_file_dir = os.path.dirname(os.path.abspath(__file__))  # .../vnpy_ctabacktester/ui/
+        vnpy_ctabacktester_dir = os.path.dirname(current_file_dir)  # .../vnpy_ctabacktester/
+        project_root = os.path.dirname(vnpy_ctabacktester_dir)  # .../atmquant/
+        results_dir = os.path.join(project_root, "backtests", "results")
+        
+        # 创建results目录（如果不存在）
+        if not os.path.exists(results_dir):
+            os.makedirs(results_dir)
+        
+        # 生成默认文件名（包含时间戳）
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        default_filename = f"optimization_results_{timestamp}.csv"
+        default_path = os.path.join(results_dir, default_filename)
+        
         path, _ = QtWidgets.QFileDialog.getSaveFileName(
-            self, "导出优化结果", "", "CSV(*.csv)")
+            self, "导出优化结果", default_path, "CSV(*.csv)")
 
         if not path:
             return
@@ -639,8 +659,28 @@ class EnhancedOptimizationResultMonitor(QtWidgets.QDialog):
 
     def export_detailed_report(self):
         """导出详细报告"""
+        import os
+        from datetime import datetime
+        
+        # 获取当前项目的绝对目录
+        # 当前文件路径: /path/to/atmquant/vnpy_ctabacktester/ui/enhanced_widget.py
+        # 需要向上2级到达项目根目录: /path/to/atmquant/
+        current_file_dir = os.path.dirname(os.path.abspath(__file__))  # .../vnpy_ctabacktester/ui/
+        vnpy_ctabacktester_dir = os.path.dirname(current_file_dir)  # .../vnpy_ctabacktester/
+        project_root = os.path.dirname(vnpy_ctabacktester_dir)  # .../atmquant/
+        reports_dir = os.path.join(project_root, "backtests", "reports")
+        
+        # 创建reports目录（如果不存在）
+        if not os.path.exists(reports_dir):
+            os.makedirs(reports_dir)
+        
+        # 生成默认文件名（包含时间戳）
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        default_filename = f"optimization_detailed_report_{timestamp}.txt"
+        default_path = os.path.join(reports_dir, default_filename)
+        
         path, _ = QtWidgets.QFileDialog.getSaveFileName(
-            self, "导出详细报告", "", "文本文件(*.txt)")
+            self, "导出详细报告", default_path, "文本文件(*.txt)")
 
         if not path:
             return

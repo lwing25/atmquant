@@ -759,7 +759,10 @@ class BacktesterChart(pg.GraphicsLayoutWidget):
         )
         self.nextRow()
 
-        self.distribution_plot = self.addPlot(title=_("盈亏分布"))
+        self.rolling_sharpe_plot = self.addPlot(
+            title=_("滚动夏普比率"),
+            axisItems={"bottom": DateAxis(self.dates, orientation="bottom")}
+        )
 
         # Add curves and bars on plot widgets
         self.balance_curve = self.balance_plot.plot(
@@ -782,9 +785,16 @@ class BacktesterChart(pg.GraphicsLayoutWidget):
         self.pnl_plot.addItem(self.profit_pnl_bar)
         self.pnl_plot.addItem(self.loss_pnl_bar)
 
-        distribution_color: str = "#6d4c41"
-        self.distribution_curve = self.distribution_plot.plot(
-            fillLevel=-0.3, brush=distribution_color, pen=distribution_color
+        # 滚动夏普比率曲线
+        sharpe_color: str = "#2196F3"
+        self.rolling_sharpe_curve = self.rolling_sharpe_plot.plot(
+            pen=pg.mkPen(sharpe_color, width=2)
+        )
+        
+        # 添加夏普比率基准线
+        baseline_color: str = "#FF5722"
+        self.sharpe_baseline = self.rolling_sharpe_plot.plot(
+            pen=pg.mkPen(baseline_color, width=1, style=QtCore.Qt.DashLine)
         )
 
     def clear_data(self) -> None:
@@ -793,7 +803,8 @@ class BacktesterChart(pg.GraphicsLayoutWidget):
         self.drawdown_curve.setData([], [])
         self.profit_pnl_bar.setOpts(x=[], height=[])
         self.loss_pnl_bar.setOpts(x=[], height=[])
-        self.distribution_curve.setData([], [])
+        self.rolling_sharpe_curve.setData([], [])
+        self.sharpe_baseline.setData([], [])
 
     def set_data(self, df: DataFrame) -> None:
         """"""
@@ -827,10 +838,42 @@ class BacktesterChart(pg.GraphicsLayoutWidget):
         self.profit_pnl_bar.setOpts(x=profit_pnl_x, height=profit_pnl_height)
         self.loss_pnl_bar.setOpts(x=loss_pnl_x, height=loss_pnl_height)
 
-        # Set data for pnl distribution
-        hist, x = np.histogram(df["net_pnl"], bins="auto")
-        x = x[:-1]
-        self.distribution_curve.setData(x, hist)
+        # 计算滚动夏普比率
+        rolling_sharpe = self.calculate_rolling_sharpe(df["net_pnl"])
+        if len(rolling_sharpe) > 0:
+            # 滚动夏普比率曲线
+            self.rolling_sharpe_curve.setData(range(len(rolling_sharpe)), rolling_sharpe)
+            
+            # 夏普比率基准线 (通常设为1.0)
+            baseline_y = [1.0] * len(rolling_sharpe)
+            self.sharpe_baseline.setData(range(len(baseline_y)), baseline_y)
+
+    def calculate_rolling_sharpe(self, pnl_series, window=30):
+        """
+        计算滚动夏普比率
+        """
+        if len(pnl_series) < window:
+            return []
+        
+        rolling_sharpe = []
+        
+        for i in range(window, len(pnl_series) + 1):
+            # 获取窗口内的收益数据
+            window_pnl = pnl_series[i-window:i]
+            
+            # 计算平均收益和标准差
+            mean_return = np.mean(window_pnl)
+            std_return = np.std(window_pnl, ddof=1)
+            
+            # 计算夏普比率 (假设无风险利率为0)
+            if std_return > 0:
+                sharpe = mean_return / std_return * np.sqrt(252)  # 年化
+            else:
+                sharpe = 0
+            
+            rolling_sharpe.append(sharpe)
+        
+        return rolling_sharpe
 
 
 class DateAxis(pg.AxisItem):
