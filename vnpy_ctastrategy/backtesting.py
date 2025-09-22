@@ -545,8 +545,8 @@ class BacktestingEngine:
             # Advanced risk metrics
             **advanced_metrics,
             # Additional data for UI display
-            "monthly_statistics": monthly_statistics.to_string(index=False) if not monthly_statistics.empty else "",
-            "interval_statistics": interval_statistics.to_string(index=False) if not interval_statistics.empty else "",
+            "monthly_statistics": self._convert_monthly_stats_to_dict(monthly_statistics),
+            "interval_statistics": self._convert_interval_stats_to_dict(interval_statistics),
         }
 
         # Calculate comprehensive rating
@@ -1094,6 +1094,65 @@ class BacktestingEngine:
         Return all daily result data.
         """
         return list(self.daily_results.values())
+    
+    def _convert_monthly_stats_to_dict(self, monthly_df: DataFrame) -> dict:
+        """
+        将月度统计DataFrame转换为字典格式，用于UI显示
+        """
+        if monthly_df.empty:
+            return {}
+        
+        result = {}
+        for _, row in monthly_df.iterrows():
+            month_str = str(row['month']).split('-')[1]  # 提取月份
+            result[month_str] = {
+                'return': row['total_pnl'] / 100000.0,  # 假设初始资金为10万，转换为收益率
+                'win_rate': float(row['win_rate'].replace('%', '')) / 100.0,  # 转换为小数
+                'trades': int(row['total_trades'])
+            }
+        return result
+    
+    def _convert_interval_stats_to_dict(self, interval_df: DataFrame) -> dict:
+        """
+        将半小时区间统计DataFrame转换为字典格式，用于UI显示
+        """
+        if interval_df.empty:
+            return {}
+        
+        result = {}
+        for _, row in interval_df.iterrows():
+            # 直接使用interval_start作为键，不进行时间区间转换
+            # 这样可以支持各种时间格式（股票、期货日盘、夜盘等）
+            interval_key = str(row['interval_start'])
+            
+            # 如果interval_start只是小时:分钟格式，可以构造区间
+            if ':' in interval_key and '-' not in interval_key:
+                try:
+                    hour, minute = interval_key.split(':')
+                    hour = int(hour)
+                    minute = int(minute)
+                    
+                    # 计算结束时间
+                    end_minute = minute + 30
+                    end_hour = hour
+                    if end_minute >= 60:
+                        end_minute -= 60
+                        end_hour += 1
+                        # 处理跨日情况
+                        if end_hour >= 24:
+                            end_hour -= 24
+                    
+                    interval_key = f"{hour:02d}:{minute:02d}-{end_hour:02d}:{end_minute:02d}"
+                except:
+                    # 如果解析失败，直接使用原始值
+                    pass
+            
+            result[interval_key] = {
+                'return': row['total_pnl'] / 100000.0,  # 假设初始资金为10万，转换为收益率
+                'win_rate': float(str(row['win_rate']).replace('%', '')) / 100.0,  # 转换为小数
+                'trades': int(row['total_trades'])
+            }
+        return result
 
 
 class DailyResult:

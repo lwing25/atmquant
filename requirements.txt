@@ -11,6 +11,10 @@ PySide6==6.8.2.1
 pyqtgraph>=0.13.7
 plotly>=6.0.0
 
+# 数据库
+sqlalchemy>=2.0.0
+pymysql>=1.1.0
+
 # 工具库
 loguru>=0.7.3
 tqdm>=4.67.1

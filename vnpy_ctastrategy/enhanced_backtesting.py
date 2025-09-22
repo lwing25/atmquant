@@ -72,6 +72,9 @@ def calculate_trade_statistics(trade_pairs: List[Dict], size: float) -> Dict:
             "average_trade": 0.0,
             "max_consecutive_wins": 0,
             "max_consecutive_losses": 0,
+            # 多头空头笔数统计
+            "long_trade_count": 0,
+            "short_trade_count": 0,
             "average_holding_time_days": 0.0,
             "average_holding_time_hours": 0.0,
             "max_holding_time_hours": 0.0,
@@ -79,15 +82,19 @@ def calculate_trade_statistics(trade_pairs: List[Dict], size: float) -> Dict:
             "median_holding_time_hours": 0.0
         }
 
-    # 计算每笔交易的盈亏
+    # 计算每笔交易的盈亏和统计多头空头笔数
     trade_pnls = []
     holding_times = []
+    long_trade_count = 0
+    short_trade_count = 0
     
     for pair in trade_pairs:
         if pair["direction"] == Direction.LONG:
             pnl = (pair["close_price"] - pair["open_price"]) * pair["volume"] * size
+            long_trade_count += 1
         else:
             pnl = (pair["open_price"] - pair["close_price"]) * pair["volume"] * size
+            short_trade_count += 1
         
         trade_pnls.append(pnl)
         holding_times.append(pair["holding_time_hours"])
@@ -152,6 +159,9 @@ def calculate_trade_statistics(trade_pairs: List[Dict], size: float) -> Dict:
         "average_trade": average_trade,
         "max_consecutive_wins": max_consecutive_wins,
         "max_consecutive_losses": max_consecutive_losses,
+        # 多头空头笔数统计
+        "long_trade_count": long_trade_count,
+        "short_trade_count": short_trade_count,
         # 小时为单位的持仓时间
         "average_holding_time_hours": average_holding_time_hours,
         "max_holding_time_hours": max_holding_time_hours,

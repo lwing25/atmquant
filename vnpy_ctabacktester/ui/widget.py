@@ -31,8 +31,12 @@ from ..engine import (
     OptimizationSetting
 )
 
+# 导入新的界面
+from .redesigned_widget import RedesignedBacktesterManager
 
-class BacktesterManager(QtWidgets.QWidget):
+
+# 保留原有的BacktesterManager类作为备份
+class OriginalBacktesterManager(QtWidgets.QWidget):
     """"""
 
     setting_filename: str = "cta_backtester_setting.json"
@@ -1501,3 +1505,11 @@ def generate_trade_pairs(trades: list) -> list:
             same_direction.append(trade)
 
     return trade_pairs
+
+# 使用新的界面设计替换原有的BacktesterManager
+class BacktesterManager(RedesignedBacktesterManager):
+    """
+    使用重新设计的回测管理器界面
+    这个类继承自RedesignedBacktesterManager，保持与原有接口的兼容性
+    """
+    pass

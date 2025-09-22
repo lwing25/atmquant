@@ -49,6 +49,8 @@ backtests/reports/
 # IDE
 .vscode/
 .idea/
+.codebuddy/
+.cursor/
 .kiro/
 *.swp
 *.swo
