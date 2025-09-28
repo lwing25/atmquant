@@ -34,6 +34,8 @@ from ..engine import (
 # 导入新的界面
 from .redesigned_widget import RedesignedBacktesterManager
 
+# 简化的增强功能集成
+
 
 # 保留原有的BacktesterManager类作为备份
 class OriginalBacktesterManager(QtWidgets.QWidget):
@@ -1268,68 +1270,24 @@ class CandleChartDialog(QtWidgets.QDialog):
     def init_ui(self) -> None:
         """"""
         self.setWindowTitle(_("回测K线图表"))
-        self.resize(1400, 800)
+        self.resize(1600, 900)  # 稍微增大窗口以容纳更多指标
 
-        # Create chart widget
-        self.chart: ChartWidget = ChartWidget()
-        self.chart.add_plot("candle", hide_x_axis=True)
-        self.chart.add_plot("volume", maximum_height=200)
-        self.chart.add_item(CandleItem, "candle", "candle")
-        self.chart.add_item(VolumeItem, "volume", "volume")
-        self.chart.add_cursor()
+        # Create enhanced chart widget
+        try:
+            from core.charts import EnhancedChartWidget
+            self.chart = EnhancedChartWidget()
+        except ImportError:
+            # 如果增强图表不可用，回退到标准图表
+            self.chart = ChartWidget()
+            self.chart.add_plot("candle", hide_x_axis=True)
+            self.chart.add_plot("volume", maximum_height=200)
+            self.chart.add_item(CandleItem, "candle", "candle")
+            self.chart.add_item(VolumeItem, "volume", "volume")
+            self.chart.add_cursor()
 
-        # Create help widget
-        text1: str = _("红色虚线 —— 盈利交易")
-        label1: QtWidgets.QLabel = QtWidgets.QLabel(text1)
-        label1.setStyleSheet("color:red")
-
-        text2: str = _("绿色虚线 —— 亏损交易")
-        label2: QtWidgets.QLabel = QtWidgets.QLabel(text2)
-        label2.setStyleSheet("color:#00FF00")
-
-        text3: str = _("黄色向上箭头 —— 买入开仓 Buy")
-        label3: QtWidgets.QLabel = QtWidgets.QLabel(text3)
-        label3.setStyleSheet("color:yellow")
-
-        text4: str = _("黄色向下箭头 —— 卖出平仓 Sell")
-        label4: QtWidgets.QLabel = QtWidgets.QLabel(text4)
-        label4.setStyleSheet("color:yellow")
-
-        text5: str = _("紫红向下箭头 —— 卖出开仓 Short")
-        label5: QtWidgets.QLabel = QtWidgets.QLabel(text5)
-        label5.setStyleSheet("color:magenta")
-
-        text6: str = _("紫红向上箭头 —— 买入平仓 Cover")
-        label6: QtWidgets.QLabel = QtWidgets.QLabel(text6)
-        label6.setStyleSheet("color:magenta")
-
-        hbox1: QtWidgets.QHBoxLayout = QtWidgets.QHBoxLayout()
-        hbox1.addStretch()
-        hbox1.addWidget(label1)
-        hbox1.addStretch()
-        hbox1.addWidget(label2)
-        hbox1.addStretch()
-
-        hbox2: QtWidgets.QHBoxLayout = QtWidgets.QHBoxLayout()
-        hbox2.addStretch()
-        hbox2.addWidget(label3)
-        hbox2.addStretch()
-        hbox2.addWidget(label4)
-        hbox2.addStretch()
-
-        hbox3: QtWidgets.QHBoxLayout = QtWidgets.QHBoxLayout()
-        hbox3.addStretch()
-        hbox3.addWidget(label5)
-        hbox3.addStretch()
-        hbox3.addWidget(label6)
-        hbox3.addStretch()
-
-        # Set layout
+        # Set layout - 简化布局，只显示图表
         vbox: QtWidgets.QVBoxLayout = QtWidgets.QVBoxLayout()
         vbox.addWidget(self.chart)
-        vbox.addLayout(hbox1)
-        vbox.addLayout(hbox2)
-        vbox.addLayout(hbox3)
         self.setLayout(vbox)
 
     def update_history(self, history: list) -> None:
