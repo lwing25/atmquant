@@ -17,10 +17,10 @@
 
 ```bash
 # 创建虚拟环境
-python3 -m venv vnpy_env
-source vnpy_env/bin/activate  # Linux/macOS
+python3 -m venv venv
+source venv/bin/activate  # Linux/macOS
 # 或
-vnpy_env\Scripts\activate  # Windows
+venv\Scripts\activate  # Windows
 
 # 安装依赖
 pip install -r requirements.txt
@@ -36,20 +36,7 @@ cp .env.example .env
 vim .env
 ```
 
-### 3. 快速测试
-
-```bash
-# 运行系统测试
-python quick_test.py
-
-# 测试日志系统
-python test_logging_system.py
-
-# 测试告警机器人（需要先配置.env）
-python test_alert_bots.py
-```
-
-### 4. 配置系统
+### 3. 配置系统
 
 ```bash
 # 复制配置文件
@@ -92,8 +79,6 @@ atmquant/                          # 项目根目录
 ├── 📁 logs/                        # 日志文件
 ├── 📁 vnpy/                        # VeighNa框架
 ├── 📄 main.py                      # 主入口文件
-├── 📄 test_logging_system.py       # 日志系统测试
-├── 📄 test_alert_bots.py           # 告警机器人测试
 ├── 📄 requirements.txt             # 依赖包
 └── 📄 README.md                    # 项目说明
 ```

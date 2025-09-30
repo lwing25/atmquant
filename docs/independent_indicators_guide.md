@@ -177,7 +177,7 @@ rect = boll.boundingRect()
 
 ```bash
 cd /Users/mac/code/atmquant
-source vnpy_env/bin/activate
+source venv/bin/activate
 python scripts/test_independent_indicators.py
 ```
 

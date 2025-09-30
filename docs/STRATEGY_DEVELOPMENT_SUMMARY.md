@@ -84,7 +84,7 @@ atmquant/
 ### 1. 测试策略
 ```bash
 cd /Users/mac/code/atmquant
-source vnpy_env/bin/activate
+source venv/bin/activate
 python scripts/test_3ma_strategy.py
 ```
 
