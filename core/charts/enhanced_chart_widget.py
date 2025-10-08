@@ -447,6 +447,16 @@ class EnhancedChartWidget(ChartWidget):
     def _create_main_indicator_controls(self):
         """创建主图指标控制面板"""
         control_widget = QtWidgets.QWidget(self)
+        
+        # 设置50%透明度的背景样式
+        control_widget.setStyleSheet("""
+            QWidget {
+                background-color: rgba(30, 30, 30, 128);
+                border-radius: 5px;
+                padding: 5px;
+            }
+        """)
+        
         control_layout = QtWidgets.QHBoxLayout(control_widget)
         control_layout.setContentsMargins(10, 0, 10, 0)
         control_layout.setSpacing(5)  # 减少控件间距
@@ -516,6 +526,16 @@ class EnhancedChartWidget(ChartWidget):
     def _create_sub_indicator_controls(self):
         """创建附图指标控制面板"""
         control_widget = QtWidgets.QWidget(self)
+        
+        # 设置50%透明度的背景样式
+        control_widget.setStyleSheet("""
+            QWidget {
+                background-color: rgba(30, 30, 30, 128);
+                border-radius: 5px;
+                padding: 5px;
+            }
+        """)
+        
         control_layout = QtWidgets.QHBoxLayout(control_widget)
         control_layout.setContentsMargins(10, 0, 10, 0)
         control_layout.setSpacing(5)  # 减少控件间距
