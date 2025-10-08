@@ -453,7 +453,6 @@ class EnhancedChartWidget(ChartWidget):
             QWidget {
                 background-color: rgba(30, 30, 30, 128);
                 border-radius: 5px;
-                padding: 5px;
             }
         """)
         
@@ -532,7 +531,6 @@ class EnhancedChartWidget(ChartWidget):
             QWidget {
                 background-color: rgba(30, 30, 30, 128);
                 border-radius: 5px;
-                padding: 5px;
             }
         """)
         
@@ -1048,7 +1046,7 @@ class EnhancedChartWidget(ChartWidget):
         
         panel_layout = QtWidgets.QVBoxLayout(panel_widget)
         panel_layout.setContentsMargins(8, 10, 8, 10)
-        panel_layout.setSpacing(10)
+        panel_layout.setSpacing(0)  # 按钮之间无空隙
         
         # 定义周期选项 - 文字竖排显示
         intervals = [
@@ -1072,25 +1070,32 @@ class EnhancedChartWidget(ChartWidget):
             
             btn.setCheckable(True)
             
-            # 设置按钮样式
+            # 设置扁平化按钮样式
             btn.setStyleSheet("""
                 QPushButton {
                     background-color: rgba(60, 60, 60, 200);
                     color: white;
-                    border: 1px solid rgba(100, 100, 100, 200);
-                    border-radius: 3px;
+                    border: none;
+                    border-radius: 0px;
                     font-size: 11px;
                     line-height: 1.2;
                     padding: 2px;
+                    margin: 0px;
                 }
                 QPushButton:hover {
                     background-color: rgba(80, 80, 80, 220);
-                    border: 1px solid rgba(120, 120, 120, 220);
                 }
                 QPushButton:checked {
                     background-color: rgba(0, 120, 215, 220);
-                    border: 2px solid rgba(0, 150, 255, 255);
                     font-weight: bold;
+                }
+                QPushButton:first-child {
+                    border-top-left-radius: 3px;
+                    border-top-right-radius: 3px;
+                }
+                QPushButton:last-child {
+                    border-bottom-left-radius: 3px;
+                    border-bottom-right-radius: 3px;
                 }
             """)
             
