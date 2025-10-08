@@ -1035,17 +1035,16 @@ class EnhancedChartWidget(ChartWidget):
     
     def _create_interval_panel(self):
         """创建时间周期切换面板"""
-        # 创建透明的容器
+        # 创建无背景的容器
         panel_widget = QtWidgets.QWidget(self)
         panel_widget.setStyleSheet("""
             QWidget {
-                background-color: rgba(30, 30, 30, 150);
-                border-radius: 5px;
+                background-color: transparent;
             }
         """)
         
         panel_layout = QtWidgets.QVBoxLayout(panel_widget)
-        panel_layout.setContentsMargins(8, 10, 8, 10)
+        panel_layout.setContentsMargins(0, 0, 0, 0)  # 无外边距
         panel_layout.setSpacing(0)  # 按钮之间无空隙
         
         # 定义周期选项 - 文字竖排显示
@@ -1115,7 +1114,7 @@ class EnhancedChartWidget(ChartWidget):
         panel_layout.addStretch()
         
         # 设置面板位置和大小
-        panel_widget.setFixedWidth(58)
+        panel_widget.setFixedWidth(40)  # 只设置按钮宽度
         panel_widget.adjustSize()
         
         self.interval_panel = panel_widget
@@ -1127,21 +1126,21 @@ class EnhancedChartWidget(ChartWidget):
             if original_resize:
                 original_resize(event)
             
-            # 更新周期面板位置（垂直居中）
+            # 更新周期面板位置（垂直居中，紧贴左边）
             if hasattr(self, 'interval_panel'):
                 # 计算垂直居中位置
                 panel_height = self.interval_panel.height()
                 window_height = self.height()
                 y_pos = (window_height - panel_height) // 2
-                self.interval_panel.move(10, max(50, y_pos))  # 至少在顶部50px处
+                self.interval_panel.move(0, max(50, y_pos))  # 紧贴左边，无缝隙
         
         self.resizeEvent = resize_handler
         
-        # 初始位置
+        # 初始位置（紧贴左边）
         panel_height = panel_widget.height()
         window_height = self.height()
         y_pos = (window_height - panel_height) // 2
-        panel_widget.move(10, max(50, y_pos))
+        panel_widget.move(0, max(50, y_pos))  # 紧贴左边，无缝隙
     
     def _on_interval_changed(self, interval, clicked_btn):
         """处理周期切换事件"""
