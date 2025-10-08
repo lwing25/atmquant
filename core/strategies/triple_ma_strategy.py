@@ -135,12 +135,6 @@ class TripleMaStrategy(BaseCtaStrategy):
         else:
             self.trend_direction = 0  # 震荡趋势
         
-        # 记录趋势
-        self.logger.info(
-            f"趋势分析 - 短期MA:{self.short_ma:.2f}, 中期MA:{mid_ma:.2f}, "
-            f"长期MA:{self.long_ma:.2f}, 趋势:{self.trend_direction}"
-        )
-
     def on_signal_bar(self, bar: BarData):
         """信号执行 - 5分钟K线更新，执行具体交易"""
         self.cancel_all()

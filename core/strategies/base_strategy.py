@@ -5,13 +5,28 @@ ATMQuant基础策略类
 基于vnpy CtaTemplate扩展，添加日志和告警功能
 """
 
+from datetime import time
+from typing import List, Tuple, Optional
+
 from vnpy_ctastrategy import CtaTemplate
 from core.logging.logger_manager import get_logger
 from core.logging.alert_manager import alert_manager
+from config.trading_sessions_config import (
+    get_trading_session_by_symbol,
+    TradingSession,
+    MarketType
+)
 
 
 class BaseCtaStrategy(CtaTemplate):
     """ATMQuant基础策略类"""
+    
+    # 交易时段定义（子类可以重写这些属性）
+    # 如果不重写，将自动根据品种代码识别市场类型并使用对应的交易时段
+    trading_session: Optional[TradingSession] = None
+    
+    # 每日收盘时间（用于日线聚合，如果未设置则使用trading_session中的值）
+    daily_end: Optional[time] = None
     
     def __init__(self, cta_engine, strategy_name, vt_symbol, setting):
         """初始化策略"""
@@ -22,6 +37,20 @@ class BaseCtaStrategy(CtaTemplate):
         
         # 策略状态
         self.strategy_status = "未启动"
+        
+        # 自动识别并设置交易时段
+        if self.trading_session is None:
+            # 解析品种代码和交易所
+            symbol = self.vt_symbol.split('.')[0]
+            exchange = self.vt_symbol.split('.')[1] if '.' in self.vt_symbol else ""
+            
+            # 自动获取交易时段
+            self.trading_session = get_trading_session_by_symbol(symbol, exchange)
+            self.logger.info(f"自动识别交易时段: {self.trading_session.name}")
+        
+        # 设置每日收盘时间
+        if self.daily_end is None:
+            self.daily_end = self.trading_session.daily_end
         
     def on_init(self):
         """策略初始化"""

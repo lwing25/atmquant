@@ -14,13 +14,6 @@ from .macd_item import Macd3Item
 from .dmi_item import DmiItem
 from .dyna_array_manager import DynaArrayManager
 
-# 导入回测集成功能
-try:
-    from vnpy_ctabacktester.ui.enhanced_candle_dialog import EnhancedCandleChartDialog, CandleChartDialog
-    _backtest_integration_available = True
-except ImportError:
-    _backtest_integration_available = False
-
 # 保持向后兼容
 try:
     from .enhanced_chart_widget import (
@@ -55,11 +48,4 @@ if _enhanced_available:
         "EnhancedChartWidget",
         "ExtendableViewBox", 
         "VolumeItem"
-    ])
-
-# 如果回测集成可用，添加到导出列表
-if _backtest_integration_available:
-    __all__.extend([
-        "EnhancedCandleChartDialog",
-        "CandleChartDialog"
     ])

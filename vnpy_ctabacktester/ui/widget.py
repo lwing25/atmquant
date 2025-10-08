@@ -1,3 +1,25 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+CTA回测模块UI组件
+
+本文件是CTA回测的主界面文件，集成了以下功能：
+1. 基础回测界面（OriginalBacktesterManager）
+2. 增强版K线图表（CandleChartDialog，使用EnhancedChartWidget）
+3. 增强版统计监控器（EnhancedStatisticsMonitor，来自enhanced_widget.py）
+4. 增强版优化结果显示（EnhancedOptimizationResultMonitor，来自enhanced_widget.py）
+
+相关文件说明：
+- widget.py（本文件）：主回测界面，已集成EnhancedChartWidget
+- enhanced_widget.py：提供EnhancedStatisticsMonitor和EnhancedOptimizationResultMonitor组件
+- redesigned_widget.py：可选的现代化界面（两列布局）
+- core/charts/enhanced_chart_widget.py：增强版图表组件（独立维护）
+
+注意：
+- CandleChartDialog已经使用EnhancedChartWidget，无需修改
+- 删除了enhanced_candle_dialog.py（功能重复）
+"""
+
 import os
 import platform
 import csv
@@ -31,10 +53,19 @@ from ..engine import (
     OptimizationSetting
 )
 
-# 导入新的界面
+# ===================================
+# 导入增强功能组件
+# ===================================
+# 导入重新设计的现代化界面（可选）
 from .redesigned_widget import RedesignedBacktesterManager
 
-# 简化的增强功能集成
+# 导入增强的统计监控器和优化结果显示器
+try:
+    from .enhanced_widget import EnhancedStatisticsMonitor, EnhancedOptimizationResultMonitor
+    ENHANCED_COMPONENTS_AVAILABLE = True
+except ImportError:
+    ENHANCED_COMPONENTS_AVAILABLE = False
+    print("Warning: Enhanced components not available")
 
 
 # 保留原有的BacktesterManager类作为备份
@@ -191,11 +222,10 @@ class OriginalBacktesterManager(QtWidgets.QWidget):
         left_vbox.addWidget(reload_button)
 
         # Result part
-        # 使用增强的统计监控器
-        try:
-            from .enhanced_widget import EnhancedStatisticsMonitor
+        # 使用增强的统计监控器（如果可用）
+        if ENHANCED_COMPONENTS_AVAILABLE:
             self.statistics_monitor = EnhancedStatisticsMonitor()
-        except ImportError:
+        else:
             self.statistics_monitor: StatisticsMonitor = StatisticsMonitor()
 
         self.log_monitor: QtWidgets.QTextEdit = QtWidgets.QTextEdit()
@@ -475,11 +505,10 @@ class OriginalBacktesterManager(QtWidgets.QWidget):
         """"""
         result_values: list = self.backtester_engine.get_result_values()
 
-        # 使用增强的优化结果监控器
-        try:
-            from .enhanced_widget import EnhancedOptimizationResultMonitor
+        # 使用增强的优化结果监控器（如果可用）
+        if ENHANCED_COMPONENTS_AVAILABLE:
             dialog = EnhancedOptimizationResultMonitor(result_values, self.target_display)
-        except ImportError:
+        else:
             dialog: OptimizationResultMonitor = OptimizationResultMonitor(
                 result_values,
                 self.target_display
@@ -1248,7 +1277,20 @@ class BacktestingResultDialog(QtWidgets.QDialog):
 
 
 class CandleChartDialog(QtWidgets.QDialog):
-    """"""
+    """
+    回测K线图表对话框
+    
+    本类已经集成了EnhancedChartWidget，提供以下功能：
+    1. 增强版K线图表显示（支持多种技术指标）
+    2. 多周期切换功能
+    3. 交易信号标记
+    4. 自动回退到标准ChartWidget（如果EnhancedChartWidget不可用）
+    
+    注意：
+    - 这是唯一的K线图表对话框类，不要使用enhanced_candle_dialog.py
+    - EnhancedChartWidget来自core/charts/enhanced_chart_widget.py
+    - 如果需要修改图表功能，请修改EnhancedChartWidget，而非此类
+    """
 
     def __init__(self) -> None:
         """"""
@@ -1268,16 +1310,30 @@ class CandleChartDialog(QtWidgets.QDialog):
         self.init_ui()
 
     def init_ui(self) -> None:
-        """"""
-        self.setWindowTitle(_("回测K线图表"))
-        self.resize(1600, 900)  # 稍微增大窗口以容纳更多指标
+        """初始化UI界面"""
+        self.setWindowTitle(_("回测K线图表(增强版)"))
+        self.resize(1600, 900)
 
-        # Create enhanced chart widget
+        # 创建增强版图表组件（优先使用EnhancedChartWidget）
         try:
             from core.charts import EnhancedChartWidget
             self.chart = EnhancedChartWidget()
-        except ImportError:
+            print("✓ 使用增强版K线图表 (EnhancedChartWidget)")
+        except ImportError as e:
             # 如果增强图表不可用，回退到标准图表
+            print(f"Warning: EnhancedChartWidget not available, falling back to standard ChartWidget")
+            print(f"ImportError: {e}")
+            self.chart = ChartWidget()
+            self.chart.add_plot("candle", hide_x_axis=True)
+            self.chart.add_plot("volume", maximum_height=200)
+            self.chart.add_item(CandleItem, "candle", "candle")
+            self.chart.add_item(VolumeItem, "volume", "volume")
+            self.chart.add_cursor()
+        except Exception as e:
+            # 捕获其他异常
+            print(f"Error loading EnhancedChartWidget: {e}")
+            import traceback
+            traceback.print_exc()
             self.chart = ChartWidget()
             self.chart.add_plot("candle", hide_x_axis=True)
             self.chart.add_plot("volume", maximum_height=200)
@@ -1293,6 +1349,22 @@ class CandleChartDialog(QtWidgets.QDialog):
     def update_history(self, history: list) -> None:
         """"""
         self.updated = True
+        
+        # 如果使用的是EnhancedChartWidget，设置交易时段和多周期功能
+        if hasattr(self.chart, 'set_trading_session_by_symbol') and history:
+            first_bar = history[0]
+            symbol = first_bar.symbol
+            exchange = first_bar.exchange.value if hasattr(first_bar.exchange, 'value') else str(first_bar.exchange)
+            
+            # 设置交易时段（用于多周期聚合）
+            self.chart.set_trading_session_by_symbol(symbol, exchange)
+            
+            # 保存基础数据（用于多周期切换）
+            if hasattr(self.chart, 'base_minute_bars'):
+                self.chart.base_minute_bars = history.copy()
+                self.chart.current_symbol = symbol
+                self.chart.current_exchange = exchange
+        
         self.chart.update_history(history)
 
         for ix, bar in enumerate(history):
