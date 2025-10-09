@@ -54,6 +54,7 @@ backtests/reports/
 .kiro/
 .specify/
 specs/
+.claude/
 *.swp
 *.swo
 

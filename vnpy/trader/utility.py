@@ -170,6 +170,7 @@ class BarGenerator:
     Notice:
     1. for x minute bar, x must be able to divide 60: 2, 3, 5, 6, 10, 15, 20, 30
     2. for x hour bar, x can be any number
+    3. hour_sessions parameter allows custom trading sessions for hour bars
     """
 
     def __init__(
@@ -178,9 +179,22 @@ class BarGenerator:
         window: int = 0,
         on_window_bar: Callable | None = None,
         interval: Interval = Interval.MINUTE,
-        daily_end: time | None = None
+        daily_end: time | None = None,
+        hour_sessions: list[tuple[time, time]] | None = None
     ) -> None:
-        """Constructor"""
+        """
+        Constructor
+        
+        Args:
+            on_bar: 1分钟K线回调函数
+            window: 窗口大小
+            on_window_bar: 窗口K线回调函数
+            interval: 窗口K线周期
+            daily_end: 每日收盘时间
+            hour_sessions: 小时交易时段列表，格式：[(开始时间, 结束时间), ...]
+                          例如：[(time(9, 0), time(9, 59)), (time(10, 0), time(11, 14))]
+                          如果为None，则使用默认的自然小时划分
+        """
         self.bar: BarData | None = None
         self.on_bar: Callable = on_bar
 
@@ -199,6 +213,10 @@ class BarGenerator:
         self.daily_end: time | None = daily_end
         if self.interval == Interval.DAILY and not self.daily_end:
             raise RuntimeError(_("合成日K线必须传入每日收盘时间"))
+        
+        # 交易时段配置（用于小时K线合成）
+        self.hour_sessions = hour_sessions
+        self.current_session_index: int | None = None
 
     def update_tick(self, tick: TickData) -> None:
         """
@@ -308,7 +326,20 @@ class BarGenerator:
             self.window_bar = None
 
     def update_bar_hour_window(self, bar: BarData) -> None:
-        """"""
+        """
+        更新小时K线窗口
+        
+        如果配置了hour_sessions，则按照交易时段合成K线
+        否则按照自然小时（59分钟）合成K线
+        """
+        # 如果配置了交易时段，使用交易时段逻辑
+        if self.hour_sessions:
+            self._update_bar_hour_window_with_sessions(bar)
+        else:
+            self._update_bar_hour_window_default(bar)
+    
+    def _update_bar_hour_window_default(self, bar: BarData) -> None:
+        """默认的小时K线更新逻辑（按自然小时）"""
         # If not inited, create window bar object
         if not self.hour_bar:
             dt: datetime = bar.datetime.replace(minute=0, second=0, microsecond=0)
@@ -385,6 +416,119 @@ class BarGenerator:
         # Push finished window bar
         if finished_bar:
             self.on_hour_bar(finished_bar)
+    
+    def _update_bar_hour_window_with_sessions(self, bar: BarData) -> None:
+        """基于交易时段的小时K线更新逻辑"""
+        bar_time = bar.datetime.time()
+        
+        # 查找当前K线所属的交易时段
+        session_index = self._find_session_index(bar_time)
+        
+        # 如果不在任何交易时段内，忽略该K线
+        if session_index is None:
+            return
+        
+        # 判断是否需要生成新的小时K线
+        need_new_hour_bar = False
+        
+        # 如果是第一根K线，或者切换到了新的交易时段
+        if not self.hour_bar:
+            need_new_hour_bar = True
+        elif self.current_session_index != session_index:
+            # 切换到新的交易时段，先推送旧的小时K线
+            finished_bar = self.hour_bar
+            self.on_hour_bar(finished_bar)
+            need_new_hour_bar = True
+        else:
+            # 同一个交易时段内，检查是否到达时段结束时间
+            session_start, session_end = self.hour_sessions[session_index]
+            if bar_time >= session_end:
+                # 到达时段结束时间，更新并推送小时K线
+                self.hour_bar.high_price = max(self.hour_bar.high_price, bar.high_price)
+                self.hour_bar.low_price = min(self.hour_bar.low_price, bar.low_price)
+                self.hour_bar.close_price = bar.close_price
+                self.hour_bar.volume += bar.volume
+                self.hour_bar.turnover += bar.turnover
+                self.hour_bar.open_interest = bar.open_interest
+                
+                finished_bar = self.hour_bar
+                self.on_hour_bar(finished_bar)
+                
+                # 检查是否立即开始下一个时段
+                next_session_index = self._find_session_index(bar_time, start_from=session_index + 1)
+                if next_session_index is not None:
+                    need_new_hour_bar = True
+                    session_index = next_session_index
+                else:
+                    self.hour_bar = None
+                    self.current_session_index = None
+                    return
+        
+        # 创建新的小时K线
+        if need_new_hour_bar:
+            session_start, session_end = self.hour_sessions[session_index]
+            dt = bar.datetime.replace(
+                hour=session_start.hour,
+                minute=session_start.minute,
+                second=0,
+                microsecond=0
+            )
+            
+            self.hour_bar = BarData(
+                symbol=bar.symbol,
+                exchange=bar.exchange,
+                datetime=dt,
+                gateway_name=bar.gateway_name,
+                open_price=bar.open_price,
+                high_price=bar.high_price,
+                low_price=bar.low_price,
+                close_price=bar.close_price,
+                volume=bar.volume,
+                turnover=bar.turnover,
+                open_interest=bar.open_interest
+            )
+            self.current_session_index = session_index
+        else:
+            # 更新现有小时K线
+            self.hour_bar.high_price = max(self.hour_bar.high_price, bar.high_price)
+            self.hour_bar.low_price = min(self.hour_bar.low_price, bar.low_price)
+            self.hour_bar.close_price = bar.close_price
+            self.hour_bar.volume += bar.volume
+            self.hour_bar.turnover += bar.turnover
+            self.hour_bar.open_interest = bar.open_interest
+    
+    def _find_session_index(
+        self,
+        bar_time: time,
+        start_from: int = 0
+    ) -> int | None:
+        """
+        查找给定时间所属的交易时段索引
+        
+        Args:
+            bar_time: K线时间
+            start_from: 从哪个索引开始查找
+        
+        Returns:
+            交易时段索引，如果不在任何时段内则返回None
+        """
+        if not self.hour_sessions:
+            return None
+        
+        for i in range(start_from, len(self.hour_sessions)):
+            session_start, session_end = self.hour_sessions[i]
+            
+            # 处理跨日的情况（例如夜盘）
+            if session_start <= session_end:
+                # 正常时段（不跨日）
+                if session_start <= bar_time <= session_end:
+                    return i
+            else:
+                # 跨日时段
+                if bar_time >= session_start or bar_time <= session_end:
+                    return i
+        
+        return None
 
     def on_hour_bar(self, bar: BarData) -> None:
         """"""

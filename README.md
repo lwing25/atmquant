@@ -151,6 +151,12 @@ atmquant/                          # 项目根目录
     - K线数据聚合算法开发
     - 技术指标自动更新机制
 
+13. **[以AI量化为生：13.交易时段小时K线合成实战](https://mp.weixin.qq.com/s/3UvbbWDhvZJactgAPtqH7w)**
+    - 交易时段K线合成问题分析
+    - 小时K线按实际交易时段合成
+    - BarGenerator核心修改实现
+    - 全球12个金融市场配置
+
 ## 开发规范
 
 ### 代码风格

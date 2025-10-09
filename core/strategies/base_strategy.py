@@ -9,6 +9,8 @@ from datetime import time
 from typing import List, Tuple, Optional
 
 from vnpy_ctastrategy import CtaTemplate
+from vnpy.trader.utility import BarGenerator
+from vnpy.trader.constant import Interval
 from core.logging.logger_manager import get_logger
 from core.logging.alert_manager import alert_manager
 from config.trading_sessions_config import (
@@ -19,7 +21,14 @@ from config.trading_sessions_config import (
 
 
 class BaseCtaStrategy(CtaTemplate):
-    """ATMQuant基础策略类"""
+    """
+    ATMQuant基础策略类
+    
+    特性：
+    1. 自动识别品种的交易时段
+    2. 支持日志和告警功能
+    3. 小时K线按照实际交易时段合成（如果配置了trading_session）
+    """
     
     # 交易时段定义（子类可以重写这些属性）
     # 如果不重写，将自动根据品种代码识别市场类型并使用对应的交易时段
