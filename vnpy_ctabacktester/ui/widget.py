@@ -1307,6 +1307,9 @@ class CandleChartDialog(QtWidgets.QDialog):
 
         self.items: list = []
 
+        # 保存原始交易数据用于多周期切换
+        self.trade_data: list = []
+
         self.init_ui()
 
     def init_ui(self) -> None:
@@ -1346,6 +1349,10 @@ class CandleChartDialog(QtWidgets.QDialog):
         vbox.addWidget(self.chart)
         self.setLayout(vbox)
 
+        # 如果使用的是EnhancedChartWidget，注册周期切换回调
+        if hasattr(self.chart, 'on_interval_changed_callback'):
+            self.chart.on_interval_changed_callback = self._on_interval_changed
+
     def update_history(self, history: list) -> None:
         """"""
         self.updated = True
@@ -1380,8 +1387,118 @@ class CandleChartDialog(QtWidgets.QDialog):
 
         self.price_range = self.high_price - self.low_price
 
+        # 如果有交易数据，自动重绘交易连线（支持多周期切换）
+        if self.trade_data:
+            self.redraw_trades()
+
+    def _calculate_bar_duration(self, interval: Interval) -> int:
+        """
+        计算K线周期对应的分钟数
+
+        Args:
+            interval: K线周期
+
+        Returns:
+            周期对应的分钟数
+        """
+        interval_minutes = {
+            Interval.MINUTE: 1,
+            Interval.HOUR: 60,
+            Interval.DAILY: 1440,  # 24小时
+        }
+
+        # 如果是字符串类型(如"5m", "15m")
+        if isinstance(interval, str):
+            if interval == "1m":
+                return 1
+            elif interval == "5m":
+                return 5
+            elif interval == "15m":
+                return 15
+            elif interval == "1h":
+                return 60
+            elif interval == "d":
+                return 1440
+            else:
+                # 尝试解析分钟数（如"30m" -> 30）
+                if interval.endswith("m"):
+                    try:
+                        return int(interval[:-1])
+                    except:
+                        pass
+                return 1  # 默认1分钟
+
+        # 如果是Interval枚举
+        return interval_minutes.get(interval, 1)
+
+    def get_bar_time_range(self, bar: BarData) -> tuple:
+        """
+        计算K线的时间范围
+
+        Args:
+            bar: K线数据
+
+        Returns:
+            (start_time, end_time) 元组
+        """
+        start_time = bar.datetime
+        duration_minutes = self._calculate_bar_duration(bar.interval)
+        end_time = start_time + timedelta(minutes=duration_minutes)
+
+        return (start_time, end_time)
+
+    def find_nearest_bar_index(self, trade_dt: datetime) -> int:
+        """
+        智能查找交易时间对应的K线索引（支持多周期）
+
+        匹配策略：
+        1. 精确匹配：交易时间刚好等于某根K线时间
+        2. 范围匹配：交易时间落在某根K线的时间范围内（用于聚合周期）
+        3. 最近匹配：找最接近的K线（兜底策略）
+
+        Args:
+            trade_dt: 交易时间
+
+        Returns:
+            K线索引，如果找不到返回None
+        """
+        # 策略1：精确匹配
+        if trade_dt in self.dt_ix_map:
+            return self.dt_ix_map[trade_dt]
+
+        # 策略2：范围匹配（用于多周期）
+        for ix, bar in self.ix_bar_map.items():
+            start_time, end_time = self.get_bar_time_range(bar)
+            # 交易时间落在K线时间范围内
+            if start_time <= trade_dt < end_time:
+                return ix
+
+        # 策略3：最近匹配（兜底）
+        if not self.dt_ix_map:
+            return None
+
+        min_diff = float('inf')
+        closest_ix = None
+
+        for dt, ix in self.dt_ix_map.items():
+            diff = abs((dt - trade_dt).total_seconds())
+            if diff < min_diff:
+                min_diff = diff
+                closest_ix = ix
+
+        return closest_ix
+
     def update_trades(self, trades: list) -> None:
-        """"""
+        """
+        更新交易数据并绘制买卖点连线（支持多周期）
+
+        Args:
+            trades: 交易列表
+        """
+        # 保存原始交易数据，用于周期切换时重绘
+        self.trade_data = trades
+
+        # 配对交易
         trade_pairs: list = generate_trade_pairs(trades)
 
         candle_plot: pg.PlotItem = self.chart.get_plot("candle")
@@ -1391,8 +1508,14 @@ class CandleChartDialog(QtWidgets.QDialog):
         y_adjustment: float = self.price_range * 0.001
 
         for d in trade_pairs:
-            open_ix = self.dt_ix_map[d["open_dt"]]
-            close_ix = self.dt_ix_map[d["close_dt"]]
+            # 使用智能时间匹配获取K线索引
+            open_ix = self.find_nearest_bar_index(d["open_dt"])
+            close_ix = self.find_nearest_bar_index(d["close_dt"])
+
+            # 如果找不到对应的K线索引，跳过这笔交易
+            if open_ix is None or close_ix is None:
+                continue
+
             open_price = d["open_price"]
             close_price = d["close_price"]
 
@@ -1407,7 +1530,8 @@ class CandleChartDialog(QtWidgets.QDialog):
             else:
                 color = "g"
 
-            pen: QtGui.QPen = pg.mkPen(color, width=1.5, style=QtCore.Qt.PenStyle.DashLine)
+            # 加粗连线，使用更醒目的宽度和样式
+            pen: QtGui.QPen = pg.mkPen(color, width=3, style=QtCore.Qt.PenStyle.DashLine)
             item: pg.PlotCurveItem = pg.PlotCurveItem(x, y, pen=pen)
 
             self.items.append(item)
@@ -1472,9 +1596,84 @@ class CandleChartDialog(QtWidgets.QDialog):
             candle_plot.addItem(open_text)
             candle_plot.addItem(close_text)
 
-        trade_scatter: pg.ScatterPlotItem = pg.ScatterPlotItem(scatter_data)
-        self.items.append(trade_scatter)
-        candle_plot.addItem(trade_scatter)
+        if scatter_data:
+            trade_scatter: pg.ScatterPlotItem = pg.ScatterPlotItem(scatter_data)
+            self.items.append(trade_scatter)
+            candle_plot.addItem(trade_scatter)
+
+    def redraw_trades(self) -> None:
+        """
+        重绘交易连线（用于周期切换后）
+
+        清除现有的交易连线和标记，然后重新绘制
+        """
+        if not self.trade_data:
+            return
+
+        # 清除现有的交易图形项
+        candle_plot: pg.PlotItem = self.chart.get_plot("candle")
+        for item in self.items:
+            candle_plot.removeItem(item)
+        self.items.clear()
+
+        # 使用保存的交易数据重新绘制
+        self.update_trades(self.trade_data)
+
+    def _on_interval_changed(self, bars: list, interval: str) -> None:
+        """
+        周期切换回调处理方法
+
+        当EnhancedChartWidget切换周期时，此方法会被调用
+        用于更新买卖点连线的显示
+
+        Args:
+            bars: 新周期的K线数据列表
+            interval: 新的周期字符串（如"1m", "5m", "15m", "1h", "d"）
+        """
+        print(f"\n[CandleChartDialog] 收到周期切换通知: {interval}")
+
+        # 第一步：清除现有的交易图形项
+        print("  清除旧的交易连线...")
+        candle_plot: pg.PlotItem = self.chart.get_plot("candle")
+        for item in self.items:
+            candle_plot.removeItem(item)
+        self.items.clear()
+
+        # 第二步：清空并重建时间索引映射
+        print("  重建时间索引映射...")
+        self.dt_ix_map.clear()
+        self.ix_bar_map.clear()
+
+        # 重置价格范围
+        self.high_price = 0
+        self.low_price = 0
+        self.price_range = 0
+
+        # 重新构建索引映射和价格范围
+        for ix, bar in enumerate(bars):
+            self.ix_bar_map[ix] = bar
+            self.dt_ix_map[bar.datetime] = ix
+
+            if not self.high_price:
+                self.high_price = bar.high_price
+                self.low_price = bar.low_price
+            else:
+                self.high_price = max(self.high_price, bar.high_price)
+                self.low_price = min(self.low_price, bar.low_price)
+
+        self.price_range = self.high_price - self.low_price
+
+        print(f"  索引映射重建完成，共 {len(bars)} 根K线")
+
+        # 第三步：重绘交易连线
+        if self.trade_data:
+            print(f"  重绘 {len(self.trade_data)} 笔交易连线...")
+            self.update_trades(self.trade_data)
+            print("  ✓ 交易连线重绘完成")
+        else:
+            print("  无交易数据需要重绘")
+
+        print(f"[CandleChartDialog] 周期切换处理完成\n")
 
     def clear_data(self) -> None:
         """"""
@@ -1489,6 +1688,9 @@ class CandleChartDialog(QtWidgets.QDialog):
 
         self.dt_ix_map.clear()
         self.ix_bar_map.clear()
+
+        # 清除保存的交易数据
+        self.trade_data.clear()
 
     def is_updated(self) -> bool:
         """"""

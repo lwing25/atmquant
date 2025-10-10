@@ -34,16 +34,6 @@ cp .env.example .env
 
 # 编辑配置文件，填入你的CTP账户信息
 vim .env
-```
-
-### 3. 配置系统
-
-```bash
-# 复制配置文件
-cp .env.example .env
-
-# 编辑配置文件，配置告警机器人
-vim .env
 
 # 启动程序（自动加载配置）
 python main.py
@@ -156,6 +146,10 @@ atmquant/                          # 项目根目录
     - 小时K线按实际交易时段合成
     - BarGenerator核心修改实现
     - 全球12个金融市场配置
+
+14. **[以AI量化为生：14.多周期交易买卖点连线智能匹配实战](https://mp.weixin.qq.com/s/B35sV1A8klZ3UIO_E9VtYg)**
+    - 多周期自适应显示与回调机制
+    - 智能时间匹配（三层级匹配策略）
 
 ## 开发规范
 

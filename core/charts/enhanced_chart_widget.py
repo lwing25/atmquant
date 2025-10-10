@@ -282,9 +282,12 @@ class EnhancedChartWidget(ChartWidget):
         self.current_exchange = None
         self.base_minute_bars = []  # 保存原始1分钟K线数据
         self.interval_buttons = {}  # 保存周期按钮引用
-        
+
         # 交易时段定义（可通过set_trading_session设置）
         self.trading_session = None  # 交易时段对象
+
+        # 周期切换回调（用于通知外部组件周期已切换）
+        self.on_interval_changed_callback = None
         
         # 调用父类初始化
         super().__init__(parent)
@@ -1231,5 +1234,15 @@ class EnhancedChartWidget(ChartWidget):
             
             # 第八步：刷新整个组件
             self.update()
-            
+
             print("✓ 周期切换完成\n")
+
+            # 第九步：通知外部组件周期已切换（如CandleChartDialog）
+            if self.on_interval_changed_callback:
+                try:
+                    print("调用周期切换回调...")
+                    self.on_interval_changed_callback(bars_to_display, self._actual_interval)
+                except Exception as e:
+                    print(f"周期切换回调执行失败: {e}")
+                    import traceback
+                    traceback.print_exc()
