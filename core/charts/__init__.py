@@ -26,6 +26,26 @@ except ImportError:
     # 如果enhanced_chart_widget有问题，只导出独立指标
     _enhanced_available = False
 
+# 导入双图组件
+try:
+    from .dual_chart_widget import (
+        DualChartWidget,
+        ChartTimeAxisSync
+    )
+    _dual_chart_available = True
+except ImportError:
+    _dual_chart_available = False
+
+# 导入四图组件
+try:
+    from .quad_chart_widget import (
+        QuadChartWidget,
+        QuadChartTimeAxisSync
+    )
+    _quad_chart_available = True
+except ImportError:
+    _quad_chart_available = False
+
 __all__ = [
     # 基础配置接口
     "ConfigurableIndicator",
@@ -46,6 +66,20 @@ __all__ = [
 if _enhanced_available:
     __all__.extend([
         "EnhancedChartWidget",
-        "ExtendableViewBox", 
+        "ExtendableViewBox",
         "VolumeItem"
+    ])
+
+# 如果双图组件可用，添加到导出列表
+if _dual_chart_available:
+    __all__.extend([
+        "DualChartWidget",
+        "ChartTimeAxisSync"
+    ])
+
+# 如果四图组件可用，添加到导出列表
+if _quad_chart_available:
+    __all__.extend([
+        "QuadChartWidget",
+        "QuadChartTimeAxisSync"
     ])

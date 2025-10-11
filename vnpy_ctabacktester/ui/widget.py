@@ -1310,6 +1310,10 @@ class CandleChartDialog(QtWidgets.QDialog):
         # 保存原始交易数据用于多周期切换
         self.trade_data: list = []
 
+        # 双图模式相关
+        self.is_dual_mode: bool = False
+        self.dual_chart = None
+
         self.init_ui()
 
     def init_ui(self) -> None:
@@ -1344,9 +1348,139 @@ class CandleChartDialog(QtWidgets.QDialog):
             self.chart.add_item(VolumeItem, "volume", "volume")
             self.chart.add_cursor()
 
-        # Set layout - 简化布局，只显示图表
+        # 创建双图组件（但默认不显示）
+        try:
+            from core.charts import DualChartWidget
+            self.dual_chart = DualChartWidget(left_period="15m", right_period="1h")
+            self.dual_chart.hide()  # 默认隐藏
+            print("✓ 双图组件创建成功")
+        except ImportError as e:
+            print(f"Warning: DualChartWidget not available: {e}")
+            self.dual_chart = None
+
+        # 创建四图组件（但默认不显示）
+        try:
+            from core.charts import QuadChartWidget
+            self.quad_chart = QuadChartWidget(
+                top_left_period="5m",
+                top_right_period="15m",
+                bottom_left_period="1h",
+                bottom_right_period="d"
+            )
+            self.quad_chart.hide()  # 默认隐藏
+            print("✓ 四图组件创建成功")
+        except ImportError as e:
+            print(f"Warning: QuadChartWidget not available: {e}")
+            self.quad_chart = None
+
+        # 创建顶部工具栏
+        toolbar = QtWidgets.QHBoxLayout()
+        toolbar.setSpacing(5)
+        toolbar.setContentsMargins(10, 5, 10, 5)
+
+        # 模式切换按钮组（文字风格 - 分段控制器）
+        if self.dual_chart or self.quad_chart:
+            # 创建按钮组
+            self.mode_button_group = QtWidgets.QButtonGroup(self)
+
+            # 单图按钮
+            self.single_mode_btn = QtWidgets.QPushButton("单图")
+            self.single_mode_btn.setCheckable(True)
+            self.single_mode_btn.setChecked(True)  # 默认单图模式
+            self.single_mode_btn.setFixedSize(50, 28)
+
+            # 双图按钮
+            self.dual_mode_btn = QtWidgets.QPushButton("双图")
+            self.dual_mode_btn.setCheckable(True)
+            self.dual_mode_btn.setFixedSize(50, 28)
+
+            # 四图按钮
+            self.quad_mode_btn = QtWidgets.QPushButton("四图")
+            self.quad_mode_btn.setCheckable(True)
+            self.quad_mode_btn.setFixedSize(50, 28)
+
+            # 设置按钮样式（分段控制器风格）
+            button_style = """
+                QPushButton {
+                    background-color: #555;
+                    color: #aaa;
+                    border: 1px solid #444;
+                    font-size: 11px;
+                    font-weight: normal;
+                    padding: 4px 8px;
+                }
+                QPushButton:hover {
+                    background-color: #666;
+                    color: #fff;
+                }
+                QPushButton:checked {
+                    background-color: #0078d4;
+                    color: white;
+                    font-weight: bold;
+                    border: 1px solid #0078d4;
+                }
+            """
+
+            # 单图按钮左圆角
+            self.single_mode_btn.setStyleSheet(button_style + """
+                QPushButton {
+                    border-top-left-radius: 4px;
+                    border-bottom-left-radius: 4px;
+                    border-right: none;
+                }
+            """)
+
+            # 双图按钮中间（无圆角）
+            self.dual_mode_btn.setStyleSheet(button_style + """
+                QPushButton {
+                    border-right: none;
+                }
+            """)
+
+            # 四图按钮右圆角
+            self.quad_mode_btn.setStyleSheet(button_style + """
+                QPushButton {
+                    border-top-right-radius: 4px;
+                    border-bottom-right-radius: 4px;
+                }
+            """)
+
+            # 添加到按钮组
+            self.mode_button_group.addButton(self.single_mode_btn, 0)
+            self.mode_button_group.addButton(self.dual_mode_btn, 1)
+            self.mode_button_group.addButton(self.quad_mode_btn, 2)
+
+            # 连接信号
+            self.mode_button_group.idClicked.connect(self._on_mode_changed)
+
+            # 添加到工具栏
+            toolbar.addWidget(QtWidgets.QLabel("视图:"))
+            toolbar.addWidget(self.single_mode_btn)
+            toolbar.addWidget(self.dual_mode_btn)
+            toolbar.addWidget(self.quad_mode_btn)
+
+        toolbar.addStretch()
+
+        # 主布局
         vbox: QtWidgets.QVBoxLayout = QtWidgets.QVBoxLayout()
+        vbox.setSpacing(0)
+        vbox.setContentsMargins(0, 0, 0, 0)
+
+        # 添加工具栏（只有在有按钮时才添加）
+        if self.dual_chart or self.quad_chart:
+            vbox.addLayout(toolbar)
+
+        # 添加图表（单图默认显示）
         vbox.addWidget(self.chart)
+
+        # 添加双图组件（默认隐藏）
+        if self.dual_chart:
+            vbox.addWidget(self.dual_chart)
+
+        # 添加四图组件（默认隐藏）
+        if self.quad_chart:
+            vbox.addWidget(self.quad_chart)
+
         self.setLayout(vbox)
 
         # 如果使用的是EnhancedChartWidget，注册周期切换回调
@@ -1356,23 +1490,34 @@ class CandleChartDialog(QtWidgets.QDialog):
     def update_history(self, history: list) -> None:
         """"""
         self.updated = True
-        
+
         # 如果使用的是EnhancedChartWidget，设置交易时段和多周期功能
         if hasattr(self.chart, 'set_trading_session_by_symbol') and history:
             first_bar = history[0]
             symbol = first_bar.symbol
             exchange = first_bar.exchange.value if hasattr(first_bar.exchange, 'value') else str(first_bar.exchange)
-            
+
             # 设置交易时段（用于多周期聚合）
             self.chart.set_trading_session_by_symbol(symbol, exchange)
-            
+
             # 保存基础数据（用于多周期切换）
             if hasattr(self.chart, 'base_minute_bars'):
                 self.chart.base_minute_bars = history.copy()
                 self.chart.current_symbol = symbol
                 self.chart.current_exchange = exchange
-        
+
         self.chart.update_history(history)
+
+        # 如果双图组件存在且当前处于双图模式，也更新双图
+        if self.dual_chart and self.is_dual_mode:
+            self.dual_chart.update_history(history)
+
+            # 设置交易时段
+            if history:
+                first_bar = history[0]
+                symbol = first_bar.symbol
+                exchange = first_bar.exchange.value if hasattr(first_bar.exchange, 'value') else str(first_bar.exchange)
+                self.dual_chart.set_trading_session_by_symbol(symbol, exchange)
 
         for ix, bar in enumerate(history):
             self.ix_bar_map[ix] = bar
@@ -1618,6 +1763,351 @@ class CandleChartDialog(QtWidgets.QDialog):
 
         # 使用保存的交易数据重新绘制
         self.update_trades(self.trade_data)
+
+    def _on_mode_changed(self, mode_id: int):
+        """
+        模式切换处理
+
+        Args:
+            mode_id: 0=单图模式, 1=双图模式, 2=四图模式
+        """
+        if mode_id == 1 and not self.dual_chart:
+            return
+        if mode_id == 2 and not self.quad_chart:
+            return
+
+        # 隐藏所有图表
+        self.chart.hide()
+        if self.dual_chart:
+            self.dual_chart.hide()
+        if self.quad_chart:
+            self.quad_chart.hide()
+
+        # 根据模式显示对应图表
+        if mode_id == 0:
+            # 单图模式
+            self.chart.show()
+            self.is_dual_mode = False
+            print("✓ 切换到单图模式")
+
+        elif mode_id == 1:
+            # 双图模式
+            self.dual_chart.show()
+            self.is_dual_mode = True
+
+            # 如果有历史数据，更新双图
+            if hasattr(self.chart, 'base_minute_bars') and self.chart.base_minute_bars:
+                self.dual_chart.update_history(self.chart.base_minute_bars)
+
+                # 设置交易时段
+                if hasattr(self.chart, 'current_symbol'):
+                    self.dual_chart.set_trading_session_by_symbol(
+                        self.chart.current_symbol,
+                        self.chart.current_exchange or ""
+                    )
+
+                # 激活对应的周期按钮
+                self._activate_dual_chart_period_buttons()
+
+                # 绘制交易连线
+                if self.trade_data:
+                    self._draw_dual_chart_trades()
+
+            print("✓ 切换到双图模式")
+
+        elif mode_id == 2:
+            # 四图模式
+            self.quad_chart.show()
+
+            # 如果有历史数据，更新四图
+            if hasattr(self.chart, 'base_minute_bars') and self.chart.base_minute_bars:
+                self.quad_chart.update_history(self.chart.base_minute_bars)
+
+                # 设置交易时段
+                if hasattr(self.chart, 'current_symbol'):
+                    self.quad_chart.set_trading_session_by_symbol(
+                        self.chart.current_symbol,
+                        self.chart.current_exchange or ""
+                    )
+
+                # 激活对应的周期按钮
+                self._activate_quad_chart_period_buttons()
+
+                # 绘制交易连线
+                if self.trade_data:
+                    self._draw_quad_chart_trades()
+
+            print("✓ 切换到四图模式")
+
+    def _activate_dual_chart_period_buttons(self):
+        """激活双图对应的周期按钮"""
+        try:
+            # 获取左右图表的周期
+            left_period = self.dual_chart.left_period
+            right_period = self.dual_chart.right_period
+
+            # 获取周期到按钮的映射
+            period_button_map = {
+                "1m": "1m",
+                "5m": "5m",
+                "15m": "15m",
+                "1h": "1h",
+                "d": "d"
+            }
+
+            # 激活左侧图表的周期按钮
+            if left_period in period_button_map and hasattr(self.dual_chart.left_chart, 'interval_buttons'):
+                button_key = period_button_map[left_period]
+                if button_key in self.dual_chart.left_chart.interval_buttons:
+                    # 先取消所有按钮
+                    for btn in self.dual_chart.left_chart.interval_buttons.values():
+                        btn.setChecked(False)
+                    # 激活对应按钮
+                    self.dual_chart.left_chart.interval_buttons[button_key].setChecked(True)
+                    print(f"✓ 激活左侧图表周期按钮: {left_period}")
+
+            # 激活右侧图表的周期按钮
+            if right_period in period_button_map and hasattr(self.dual_chart.right_chart, 'interval_buttons'):
+                button_key = period_button_map[right_period]
+                if button_key in self.dual_chart.right_chart.interval_buttons:
+                    # 先取消所有按钮
+                    for btn in self.dual_chart.right_chart.interval_buttons.values():
+                        btn.setChecked(False)
+                    # 激活对应按钮
+                    self.dual_chart.right_chart.interval_buttons[button_key].setChecked(True)
+                    print(f"✓ 激活右侧图表周期按钮: {right_period}")
+
+        except Exception as e:
+            print(f"激活周期按钮失败: {e}")
+
+    def _activate_quad_chart_period_buttons(self):
+        """激活四图对应的周期按钮"""
+        try:
+            # 获取四个图表的周期
+            periods = self.quad_chart.periods
+
+            # 获取周期到按钮的映射
+            period_button_map = {
+                "1m": "1m",
+                "5m": "5m",
+                "15m": "15m",
+                "1h": "1h",
+                "d": "d"
+            }
+
+            # 遍历四个图表，激活对应的周期按钮
+            for chart_name, period in periods.items():
+                chart = self.quad_chart.charts[chart_name]
+
+                if period in period_button_map and hasattr(chart, 'interval_buttons'):
+                    button_key = period_button_map[period]
+                    if button_key in chart.interval_buttons:
+                        # 先取消所有按钮
+                        for btn in chart.interval_buttons.values():
+                            btn.setChecked(False)
+                        # 激活对应按钮
+                        chart.interval_buttons[button_key].setChecked(True)
+                        print(f"✓ 激活{chart_name}图表周期按钮: {period}")
+
+        except Exception as e:
+            print(f"激活四图周期按钮失败: {e}")
+
+    def _draw_quad_chart_trades(self):
+        """在四图上绘制交易连线"""
+        try:
+            # 遍历四个图表
+            for chart_name, chart in self.quad_chart.charts.items():
+                bars = chart._manager.get_all_bars()
+                if not bars:
+                    print(f"{chart_name}图表K线数据为空，跳过")
+                    continue
+
+                # 为每个图表绘制交易连线
+                self._draw_trades_on_chart(chart, bars, chart_name)
+
+            print("✓ 四图交易连线绘制完成")
+
+        except Exception as e:
+            print(f"绘制四图交易连线失败: {e}")
+            import traceback
+            traceback.print_exc()
+
+    def _draw_dual_chart_trades(self):
+        """在双图上绘制交易连线"""
+        try:
+            # 获取左右图表
+            left_chart = self.dual_chart.left_chart
+            right_chart = self.dual_chart.right_chart
+
+            # 获取左右图表的K线数据
+            left_bars = left_chart._manager.get_all_bars()
+            right_bars = right_chart._manager.get_all_bars()
+
+            if not left_bars or not right_bars:
+                print("双图K线数据为空，无法绘制交易连线")
+                return
+
+            # 为左侧图表绘制交易连线
+            self._draw_trades_on_chart(left_chart, left_bars, "左侧")
+
+            # 为右侧图表绘制交易连线
+            self._draw_trades_on_chart(right_chart, right_bars, "右侧")
+
+            print("✓ 双图交易连线绘制完成")
+
+        except Exception as e:
+            print(f"绘制双图交易连线失败: {e}")
+            import traceback
+            traceback.print_exc()
+
+    def _draw_trades_on_chart(self, chart, bars, chart_name):
+        """
+        在指定图表上绘制交易连线
+
+        Args:
+            chart: EnhancedChartWidget实例
+            bars: K线数据
+            chart_name: 图表名称（用于日志）
+        """
+        if not self.trade_data:
+            return
+
+        # 配对交易
+        trade_pairs: list = generate_trade_pairs(self.trade_data)
+
+        candle_plot: pg.PlotItem = chart.get_plot("candle")
+        if not candle_plot:
+            print(f"{chart_name}图表没有candle plot")
+            return
+
+        # 构建时间索引映射
+        dt_ix_map = {}
+        ix_bar_map = {}
+        high_price = 0
+        low_price = 0
+
+        for ix, bar in enumerate(bars):
+            dt_ix_map[bar.datetime] = ix
+            ix_bar_map[ix] = bar
+
+            if not high_price:
+                high_price = bar.high_price
+                low_price = bar.low_price
+            else:
+                high_price = max(high_price, bar.high_price)
+                low_price = min(low_price, bar.low_price)
+
+        price_range = high_price - low_price
+        y_adjustment: float = price_range * 0.001
+
+        # 绘制交易对
+        for d in trade_pairs:
+            # 智能匹配K线索引
+            open_ix = self._find_bar_index_for_trade(d["open_dt"], bars, dt_ix_map, ix_bar_map)
+            close_ix = self._find_bar_index_for_trade(d["close_dt"], bars, dt_ix_map, ix_bar_map)
+
+            if open_ix is None or close_ix is None:
+                continue
+
+            open_price = d["open_price"]
+            close_price = d["close_price"]
+
+            # Trade Line
+            x: list = [open_ix, close_ix]
+            y: list = [open_price, close_price]
+
+            if d["direction"] == Direction.LONG and close_price >= open_price:
+                color: str = "r"
+            elif d["direction"] == Direction.SHORT and close_price <= open_price:
+                color = "r"
+            else:
+                color = "g"
+
+            # 加粗连线
+            pen: QtGui.QPen = pg.mkPen(color, width=3, style=QtCore.Qt.PenStyle.DashLine)
+            item: pg.PlotCurveItem = pg.PlotCurveItem(x, y, pen=pen)
+            candle_plot.addItem(item)
+
+            # Trade Scatter
+            open_bar: BarData = ix_bar_map[open_ix]
+            close_bar: BarData = ix_bar_map[close_ix]
+
+            if d["direction"] == Direction.LONG:
+                scatter_color: str = "yellow"
+                open_symbol: str = "t1"
+                close_symbol: str = "t"
+                open_side: int = 1
+                close_side: int = -1
+                open_y: float = open_bar.low_price
+                close_y: float = close_bar.high_price
+            else:
+                scatter_color = "magenta"
+                open_symbol = "t"
+                close_symbol = "t1"
+                open_side = -1
+                close_side = 1
+                open_y = open_bar.high_price
+                close_y = close_bar.low_price
+
+            pen = pg.mkPen(QtGui.QColor(scatter_color))
+            brush: QtGui.QBrush = pg.mkBrush(QtGui.QColor(scatter_color))
+            size: int = 10
+
+            open_scatter: dict = {
+                "pos": (open_ix, open_y - open_side * y_adjustment),
+                "size": size,
+                "pen": pen,
+                "brush": brush,
+                "symbol": open_symbol
+            }
+
+            close_scatter: dict = {
+                "pos": (close_ix, close_y - close_side * y_adjustment),
+                "size": size,
+                "pen": pen,
+                "brush": brush,
+                "symbol": close_symbol
+            }
+
+            scatter_item: pg.ScatterPlotItem = pg.ScatterPlotItem([open_scatter, close_scatter])
+            candle_plot.addItem(scatter_item)
+
+        print(f"✓ {chart_name}图表绘制了 {len(trade_pairs)} 对交易连线")
+
+    def _find_bar_index_for_trade(self, trade_dt, bars, dt_ix_map, ix_bar_map):
+        """
+        为交易时间找到对应的K线索引（支持多周期）
+
+        Args:
+            trade_dt: 交易时间
+            bars: K线数据列表
+            dt_ix_map: 时间到索引的映射
+            ix_bar_map: 索引到K线的映射
+
+        Returns:
+            K线索引，找不到返回None
+        """
+        # 策略1：精确匹配
+        if trade_dt in dt_ix_map:
+            return dt_ix_map[trade_dt]
+
+        # 策略2：范围匹配（用于多周期）
+        for ix, bar in ix_bar_map.items():
+            start_time, end_time = self.get_bar_time_range(bar)
+            if start_time <= trade_dt < end_time:
+                return ix
+
+        # 策略3：最近匹配
+        min_diff = float('inf')
+        closest_ix = None
+
+        for dt, ix in dt_ix_map.items():
+            diff = abs((dt - trade_dt).total_seconds())
+            if diff < min_diff:
+                min_diff = diff
+                closest_ix = ix
+
+        return closest_ix
 
     def _on_interval_changed(self, bars: list, interval: str) -> None:
         """
