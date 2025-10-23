@@ -366,23 +366,177 @@ class Macd3Item(ChartItem, ConfigurableIndicator):
         if ix in self.macd_data:
             macd_values = self.macd_data[ix]
             diff = macd_values[0]
-            dea = macd_values[1] 
+            dea = macd_values[1]
             macd = macd_values[2]
-            
+
             # 检查是否应用了放大因子
             scale_text = f" ×{self.scale_factor:.0f}" if self.scale_factor != 1.0 else ""
-            
+
             # 基础信息
-            words = [
+            info_lines = [
                 f"MACD ({self.short_window},{self.long_window},{self.M}){scale_text}",
                 f"DIFF: {diff:.4f}",
                 f"DEA: {dea:.4f}",
                 f"MACD: {macd:.4f}",
             ]
-            
-            return "\n".join(words)
-        
-        return f"MACD({self.short_window},{self.long_window},{self.M})"
+
+            # 获取前一个数据用于趋势判断
+            prev_ix = ix - 1
+            if prev_ix in self.macd_data:
+                prev_values = self.macd_data[prev_ix]
+                prev_diff = prev_values[0]
+                prev_dea = prev_values[1]
+                prev_macd = prev_values[2]
+
+                # 提前计算变化量，避免作用域问题
+                macd_change = macd - prev_macd
+                diff_change = diff - prev_diff
+
+                # MACD柱状图分析 - 核心指标
+                if macd > 0:
+                    if prev_macd <= 0:
+                        info_lines.append("MACD转正 - 多头启动信号")
+                        info_lines.append("策略: 重要买入信号，可建仓做多")
+                    else:
+                        if macd_change > abs(prev_macd) * 0.3:
+                            info_lines.append("MACD快速放大 - 多头动能增强")
+                            info_lines.append("趋势: 上涨加速，持有多单")
+                        elif macd_change < 0:
+                            info_lines.append("MACD红柱缩短 - 多头动能减弱")
+                            info_lines.append("警惕: 上涨放缓，注意止盈")
+                        else:
+                            info_lines.append("MACD红柱 - 多头主导")
+                else:
+                    if prev_macd >= 0:
+                        info_lines.append("MACD转负 - 空头启动信号")
+                        info_lines.append("策略: 重要卖出信号，可建仓做空")
+                    else:
+                        if macd_change < abs(prev_macd) * 0.3:
+                            info_lines.append("MACD快速放大 - 空头动能增强")
+                            info_lines.append("趋势: 下跌加速，持有空单")
+                        elif macd_change > 0:
+                            info_lines.append("MACD绿柱缩短 - 空头动能减弱")
+                            info_lines.append("警惕: 下跌放缓，注意止盈")
+                        else:
+                            info_lines.append("MACD绿柱 - 空头主导")
+
+                # 零轴位置分析 - 趋势判断
+                if diff > 0 and dea > 0:
+                    info_lines.append("零轴上方 - 多头市场")
+                    if macd > 0:
+                        info_lines.append("市场状态: 强势多头，做多为主")
+                    else:
+                        info_lines.append("市场状态: 多头调整，回调做多")
+                elif diff < 0 and dea < 0:
+                    info_lines.append("零轴下方 - 空头市场")
+                    if macd < 0:
+                        info_lines.append("市场状态: 强势空头，做空为主")
+                    else:
+                        info_lines.append("市场状态: 空头调整，反弹做空")
+                else:
+                    info_lines.append("零轴附近 - 多空转换中")
+                    info_lines.append("市场状态: 观望为主，等待方向明确")
+
+                # 金叉死叉分析 - 经典信号
+                if prev_diff <= prev_dea and diff > dea:
+                    if diff > 0:
+                        info_lines.append("黄金交叉(零轴上方) - 强烈买入信号")
+                        info_lines.append("操作: 积极做多，这是强势金叉")
+                    else:
+                        info_lines.append("黄金交叉(零轴下方) - 初步买入信号")
+                        info_lines.append("操作: 谨慎做多，等待零轴确认")
+
+                elif prev_diff >= prev_dea and diff < dea:
+                    if diff < 0:
+                        info_lines.append("死亡交叉(零轴下方) - 强烈卖出信号")
+                        info_lines.append("操作: 积极做空，这是强势死叉")
+                    else:
+                        info_lines.append("死亡交叉(零轴上方) - 初步卖出信号")
+                        info_lines.append("操作: 谨慎做空，等待零轴确认")
+
+                # DIFF线趋势分析
+                diff_slope_ratio = abs(diff_change / prev_diff) * 100 if prev_diff != 0 else 0
+
+                if diff_slope_ratio > 10:
+                    if diff_change > 0:
+                        info_lines.append("DIFF急速上升 - 买入动能强劲")
+                    else:
+                        info_lines.append("DIFF急速下降 - 卖出动能强劲")
+                elif diff_slope_ratio > 5:
+                    if diff_change > 0:
+                        info_lines.append("DIFF稳步上升 - 买入力量持续")
+                    else:
+                        info_lines.append("DIFF稳步下降 - 卖出力量持续")
+
+                # MACD背离检测提示
+                if ix in self.start_bull_indices:
+                    info_lines.append("检测到底背离 - 反转看涨信号")
+                    info_lines.append("重要机会: 价格新低而MACD不创新低")
+                    info_lines.append("策略: 等待价格企稳后积极做多")
+
+                if ix in self.start_bear_indices:
+                    info_lines.append("检测到顶背离 - 反转看跌信号")
+                    info_lines.append("重要警告: 价格新高而MACD不创新高")
+                    info_lines.append("策略: 等待价格回落后积极做空")
+
+                # DIFF和DEA之间的距离分析
+                diff_dea_distance = abs(diff - dea)
+                if diff_dea_distance < abs(diff) * 0.1:
+                    info_lines.append("DIFF与DEA粘合 - 变盘临近")
+                    info_lines.append("关注: 即将产生金叉或死叉信号")
+
+                # 零轴突破分析 - 重要趋势信号
+                if prev_diff <= 0 and diff > 0:
+                    info_lines.append("DIFF突破零轴 - 由弱转强")
+                    info_lines.append("策略: 重要多头信号，可加仓做多")
+                elif prev_diff >= 0 and diff < 0:
+                    info_lines.append("DIFF跌破零轴 - 由强转弱")
+                    info_lines.append("策略: 重要空头信号，可加仓做空")
+
+                if prev_dea <= 0 and dea > 0:
+                    info_lines.append("DEA突破零轴 - 趋势确认转多")
+                    info_lines.append("确认: 多头趋势已确立")
+                elif prev_dea >= 0 and dea < 0:
+                    info_lines.append("DEA跌破零轴 - 趋势确认转空")
+                    info_lines.append("确认: 空头趋势已确立")
+
+                # MACD柱状图能量分析
+                if abs(macd) > abs(prev_macd) * 2:
+                    info_lines.append("MACD能量爆发 - 趋势加速")
+                    info_lines.append("警惕: 短期可能过度，注意回调风险")
+
+                # 结合价格位置的综合判断（如果可以获取价格）
+                bar = self._manager.get_bar(ix)
+                if bar:
+                    prev_bar = self._manager.get_bar(prev_ix)
+                    if prev_bar:
+                        price_change = (bar.close_price - prev_bar.close_price) / prev_bar.close_price * 100
+
+                        # 价格MACD背离初步判断
+                        if price_change > 2 and macd_change < 0 and macd > 0:
+                            info_lines.append("价格大涨但MACD缩短 - 背离迹象")
+                            info_lines.append("警告: 可能形成顶背离，注意风险")
+                        elif price_change < -2 and macd_change > 0 and macd < 0:
+                            info_lines.append("价格大跌但MACD缩短 - 背离迹象")
+                            info_lines.append("机会: 可能形成底背离，关注反转")
+
+            else:
+                # 没有前一个数据时的基本判断
+                if macd > 0:
+                    info_lines.append("MACD红柱 - 多头主导")
+                elif macd < 0:
+                    info_lines.append("MACD绿柱 - 空头主导")
+                else:
+                    info_lines.append("MACD零值 - 多空均衡")
+
+                if diff > 0:
+                    info_lines.append("零轴上方 - 多头市场")
+                elif diff < 0:
+                    info_lines.append("零轴下方 - 空头市场")
+
+            return "\n".join(info_lines)
+
+        return f"MACD({self.short_window},{self.long_window},{self.M}) - 数据不足"
 
     def clear_all(self) -> None:
         """清空所有数据和缓存"""

@@ -54,14 +54,6 @@
 
 ---
 
-### 已删除文件
-
-#### ~~`enhanced_candle_dialog.py`~~ ❌ **已删除**
-- **原因**：功能与 `widget.py` 中的 `CandleChartDialog` 完全重复
-- **替代方案**：直接使用 `widget.py` 中的 `CandleChartDialog`
-
----
-
 ## 🔗 依赖关系
 
 ```
@@ -156,7 +148,6 @@ BacktesterManager = RedesignedBacktesterManager  # 使用现代化界面
 ## 📝 更新日志
 
 ### 2025-01-06
-- ✅ 删除重复文件 `enhanced_candle_dialog.py`
 - ✅ 在 `widget.py` 中集成 `EnhancedChartWidget`
 - ✅ 统一使用 `CandleChartDialog` 作为K线图表对话框
 - ✅ 添加清晰的文件头注释和说明文档

@@ -2,11 +2,6 @@
 
 ## 📋 已完成的工作
 
-### 1. ✅ 删除重复文件
-- 删除 `enhanced_candle_dialog.py`
-  - **原因**：功能与 `widget.py` 中的 `CandleChartDialog` 完全重复
-  - **影响**：无，所有功能已在 `widget.py` 中实现
-
 ### 2. ✅ 统一K线图表入口
 - `widget.py` 中的 `CandleChartDialog` 已经集成 `EnhancedChartWidget`
 - 添加详细的类文档说明
@@ -62,7 +57,6 @@ core/charts/
 ## 🎯 关键改进点
 
 ### 1. 避免重复代码
-- ❌ 删除了重复的 `enhanced_candle_dialog.py`
 - ✅ 统一使用 `widget.py` 中的 `CandleChartDialog`
 
 ### 2. 清晰的职责划分
@@ -109,7 +103,6 @@ BacktesterManager = OriginalBacktesterManager  # 使用原始界面
 
 ### 不要做的事
 1. ❌ 在 `widget.py` 中直接修改图表代码
-2. ❌ 寻找 `enhanced_candle_dialog.py`（已删除）
 3. ❌ 复制粘贴代码到多个文件
 
 ## 🧪 测试建议

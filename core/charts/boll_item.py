@@ -160,12 +160,183 @@ class BollItem(CandleItem, ConfigurableIndicator):
         """获取布林带信息文本，包含数值和交易指导"""
         if ix in self.boll_data:
             boll_value = self.boll_data[ix]
-            text = f"BOLL({self.boll_window}) {boll_value['middle']:.1f}\n"
-            text += f"UPPER: {boll_value['upper']:.1f}\n"
-            text += f"LOWER: {boll_value['lower']:.1f}"
-            return text
+            info_lines = []
+
+            # 基础信息
+            info_lines.append(f"BOLL({self.boll_window},{self.std_dev:.1f})")
+            info_lines.append(f"上轨: {boll_value['upper']:.2f}")
+            info_lines.append(f"中轨: {boll_value['middle']:.2f}")
+            info_lines.append(f"下轨: {boll_value['lower']:.2f}")
+
+            # 获取当前价格
+            bar = self._manager.get_bar(ix)
+            if not bar:
+                return "\n".join(info_lines)
+
+            price = bar.close_price
+            upper = boll_value['upper']
+            lower = boll_value['lower']
+            middle = boll_value['middle']
+            width = upper - lower
+
+            # 获取前一个数据用于趋势分析
+            prev_ix = ix - 1
+            prev_price = None
+            prev_width = None
+            prev_boll = None
+
+            if prev_ix >= 0 and prev_ix in self.boll_data:
+                prev_bar = self._manager.get_bar(prev_ix)
+                if prev_bar:
+                    prev_price = prev_bar.close_price
+                prev_boll = self.boll_data[prev_ix]
+                prev_width = prev_boll['upper'] - prev_boll['lower']
+
+            # 计算价格在布林带中的位置百分比
+            bb_position = (price - lower) / width if width > 0 else 0.5
+            info_lines.append(f"位置: {bb_position*100:.1f}% (0%=下轨, 100%=上轨)")
+
+            # 价格位置分析 - 针对商品期货优化
+            if price > upper:
+                deviation = (price - upper) / width * 100
+                info_lines.append(f"突破上轨 - 强势超买 (+{deviation:.1f}%)")
+                if deviation > 20:
+                    info_lines.append("极度突破 - 警惕短期回调风险")
+                else:
+                    info_lines.append("策略: 强势突破可持有，设止损在上轨")
+            elif price < lower:
+                deviation = (lower - price) / width * 100
+                info_lines.append(f"跌破下轨 - 弱势超卖 (-{deviation:.1f}%)")
+                if deviation > 20:
+                    info_lines.append("极度突破 - 关注短期反弹机会")
+                else:
+                    info_lines.append("策略: 弱势突破可观望，等反弹确认")
+            elif bb_position > 0.8:
+                info_lines.append("接近上轨 - 偏强区域")
+                info_lines.append("操作: 准备减仓或设移动止盈")
+            elif bb_position < 0.2:
+                info_lines.append("接近下轨 - 偏弱区域")
+                info_lines.append("操作: 准备加仓或等反弹信号")
+            elif 0.4 <= bb_position <= 0.6:
+                info_lines.append("中轨附近 - 关键位置")
+                info_lines.append("观察: 突破中轨方向决定后续操作")
+
+            # 价格与中轨关系分析
+            if prev_price and prev_boll:
+                middle_cross = False
+
+                if prev_price <= prev_boll['middle'] and price > middle:
+                    info_lines.append("突破中轨 - 转强信号")
+                    info_lines.append("策略: 可尝试做多，止损设在中轨下方")
+                    middle_cross = True
+                elif prev_price >= prev_boll['middle'] and price < middle:
+                    info_lines.append("跌破中轨 - 转弱信号")
+                    info_lines.append("策略: 可尝试做空，止损设在中轨上方")
+                    middle_cross = True
+
+                # 价格变化速度分析
+                if not middle_cross:
+                    price_change = abs(price - prev_price)
+                    if price_change > width * 0.15:
+                        if price > prev_price:
+                            info_lines.append("价格急速上涨 - 动能强劲")
+                            info_lines.append("警惕: 快速上涨后易出现调整")
+                        else:
+                            info_lines.append("价格急速下跌 - 抛压沉重")
+                            info_lines.append("警惕: 快速下跌后易出现反弹")
+
+            # 布林带宽度分析 - 波动性指标
+            if prev_width and prev_width > 0:
+                width_change = (width - prev_width) / prev_width * 100
+
+                if width_change > 8:
+                    info_lines.append(f"急速扩张 (+{width_change:.1f}%) - 高波动来临")
+                    info_lines.append("市场特征: 趋势行情启动，波动加剧")
+                    info_lines.append("策略: 顺势操作，扩大止损空间")
+                elif width_change > 3:
+                    info_lines.append(f"温和扩张 (+{width_change:.1f}%) - 波动增加")
+                    info_lines.append("市场特征: 行情开始活跃")
+                    info_lines.append("策略: 关注方向选择，准备顺势")
+                elif width_change < -8:
+                    info_lines.append(f"急速收缩 ({width_change:.1f}%) - 波动骤减")
+                    info_lines.append("市场特征: 酝酿重大变盘")
+                    info_lines.append("策略: 控制仓位，等待突破")
+                elif width_change < -3:
+                    info_lines.append(f"温和收缩 ({width_change:.1f}%) - 整理阶段")
+                    info_lines.append("市场特征: 进入整理期")
+                    info_lines.append("策略: 区间操作为主")
+                else:
+                    info_lines.append(f"稳定 ({width_change:+.1f}%) - 波动持平")
+
+            # 布林带宽度比率分析 - 绝对波动水平
+            width_ratio = width / middle * 100 if middle > 0 else 0
+
+            if width_ratio < 2:
+                info_lines.append(f"极度收敛 (宽度比{width_ratio:.1f}%)")
+                info_lines.append("重要信号: 重大变盘在即")
+                info_lines.append("操作: 准备捕捉突破，设双向止损")
+            elif width_ratio < 4:
+                info_lines.append(f"收敛中 (宽度比{width_ratio:.1f}%)")
+                info_lines.append("市场状态: 震荡整理，等待突破")
+            elif width_ratio > 15:
+                info_lines.append(f"极度发散 (宽度比{width_ratio:.1f}%)")
+                info_lines.append("警惕信号: 波动过度，趋势末期")
+                info_lines.append("操作: 谨慎追高杀跌，准备反转")
+            elif width_ratio > 10:
+                info_lines.append(f"发散中 (宽度比{width_ratio:.1f}%)")
+                info_lines.append("市场状态: 趋势行情，波动较大")
+
+            # 布林带上下轨突破分析
+            if prev_price and prev_boll:
+                # 上轨突破
+                if prev_price <= prev_boll['upper'] and price > upper:
+                    if width_change and width_change > 5:
+                        info_lines.append("上轨突破+扩张 - 强势突破有效")
+                        info_lines.append("策略: 可追涨，止损设在布林带中轨")
+                    else:
+                        info_lines.append("上轨突破+收缩 - 假突破可能")
+                        info_lines.append("策略: 谨慎追涨，等待确认")
+
+                # 下轨突破
+                elif prev_price >= prev_boll['lower'] and price < lower:
+                    if width_change and width_change > 5:
+                        info_lines.append("下轨突破+扩张 - 弱势突破有效")
+                        info_lines.append("策略: 可追跌，止损设在布林带中轨")
+                    else:
+                        info_lines.append("下轨突破+收缩 - 假突破可能")
+                        info_lines.append("策略: 谨慎追跌，等待确认")
+
+            # 经典布林带策略提示
+            if bb_position > 0.8 and width_change and width_change > 5:
+                info_lines.append("经典策略: 布林带开口+接近上轨")
+                info_lines.append("操作: 强势行情，持有多单，移动止盈")
+            elif bb_position < 0.2 and width_change and width_change > 5:
+                info_lines.append("经典策略: 布林带开口+接近下轨")
+                info_lines.append("操作: 弱势行情，持有空单，移动止盈")
+            elif 0.3 <= bb_position <= 0.7 and width_ratio < 3:
+                info_lines.append("经典策略: 布林带收口+中轨附近")
+                info_lines.append("操作: 震荡行情，高抛低吸，突破追单")
+
+            # 布林带压力支撑分析
+            distance_to_upper = (upper - price) / price * 100
+            distance_to_lower = (price - lower) / price * 100
+            distance_to_middle = abs(price - middle) / price * 100
+
+            if distance_to_middle < 0.5:
+                info_lines.append(f"紧贴中轨 ({distance_to_middle:.2f}%) - 方向待定")
+                info_lines.append("关键位: 中轨突破决定短期方向")
+            elif price > middle:
+                info_lines.append(f"上方空间: {distance_to_upper:.1f}% 至上轨")
+                if distance_to_upper < 1:
+                    info_lines.append("提示: 接近上轨阻力，注意回落")
+            else:
+                info_lines.append(f"下方空间: {distance_to_lower:.1f}% 至下轨")
+                if distance_to_lower < 1:
+                    info_lines.append("提示: 接近下轨支撑，注意反弹")
+
+            return "\n".join(info_lines)
         else:
-            return "BOLL数据不足"
+            return f"BOLL({self.boll_window}) - 数据不足"
 
     def clear_all(self) -> None:
         """清除所有数据"""

@@ -186,21 +186,125 @@ class RsiItem(ChartItem, ConfigurableIndicator):
         """获取RSI信息文本，包含数值和交易指导"""
         if ix in self.rsi_data:
             rsi_value = self.rsi_data[ix]
-            
+
             # 基础信息
             words = [f"RSI ({self.rsi_window}): {rsi_value:.1f}"]
-            
-            # 添加状态信息
-            if rsi_value > self.rsi_long_threshold:
-                words.append("状态: 超买")
-            elif rsi_value < self.rsi_short_threshold:
-                words.append("状态: 超卖")
+
+            # 获取前一个数据用于趋势判断
+            prev_ix = ix - 1
+            if prev_ix in self.rsi_data:
+                prev_rsi = self.rsi_data[prev_ix]
+
+                # RSI区间分析 - 针对商品期货优化阈值
+                if rsi_value >= 80:
+                    words.append("极度超买 - 强烈卖出信号")
+                    words.append("风险提示: 短期回调概率极大")
+                elif rsi_value >= self.rsi_long_threshold:
+                    words.append(f"超买区域 - 谨慎做多")
+                    words.append("操作建议: 考虑分批减仓")
+                elif rsi_value <= 20:
+                    words.append("极度超卖 - 强烈买入信号")
+                    words.append("机会提示: 短期反弹概率极大")
+                elif rsi_value <= self.rsi_short_threshold:
+                    words.append(f"超卖区域 - 关注做多")
+                    words.append("操作建议: 可分批建仓")
+                elif 45 <= rsi_value <= 55:
+                    words.append("中性区域 - 观望为主")
+                    words.append("策略: 等待明确突破信号")
+                elif rsi_value > 55:
+                    words.append("偏强区域 - 多头占优")
+                    words.append("策略: 回调做多，注意止盈")
+                else:
+                    words.append("偏弱区域 - 空头占优")
+                    words.append("策略: 反弹做空，注意止损")
+
+                # RSI趋势分析 - 动量变化
+                rsi_change = rsi_value - prev_rsi
+                if abs(rsi_change) > 5:
+                    if rsi_change > 0:
+                        words.append("RSI快速上升 - 买盘动能强劲")
+                        words.append("趋势: 短期动量加速向上")
+                    else:
+                        words.append("RSI快速下降 - 卖盘抛压加重")
+                        words.append("趋势: 短期动量加速向下")
+                elif abs(rsi_change) > 2:
+                    if rsi_change > 0:
+                        words.append("RSI温和上升 - 买盘稳步增加")
+                    else:
+                        words.append("RSI温和下降 - 卖盘稳步增加")
+                elif abs(rsi_change) < 0.5:
+                    words.append("RSI平稳 - 多空力量均衡")
+                    words.append("市场状态: 短期震荡整理")
+
+                # 持续性警告 - 背离风险提示
+                if rsi_value > 70 and prev_rsi > 70:
+                    words.append("持续超买 - 警惕顶背离风险")
+                    words.append("风险管理: 严格设置止盈位")
+                elif rsi_value < 30 and prev_rsi < 30:
+                    words.append("持续超卖 - 关注底背离机会")
+                    words.append("机会把握: 等待反转确认信号")
+
+                # 关键位突破分析 - 重要技术位
+                if prev_rsi <= 50 and rsi_value > 50:
+                    words.append("突破中线(50) - 多头转强信号")
+                    words.append("操作: 可尝试做多，止损设在50下方")
+                elif prev_rsi >= 50 and rsi_value < 50:
+                    words.append("跌破中线(50) - 空头转强信号")
+                    words.append("操作: 可尝试做空，止损设在50上方")
+
+                # 超买超卖线突破
+                if prev_rsi <= self.rsi_long_threshold and rsi_value > self.rsi_long_threshold:
+                    words.append(f"进入超买({self.rsi_long_threshold}) - 开始减仓信号")
+                    words.append("时机: 首次进入超买区可持有，深度超买需减仓")
+                elif prev_rsi >= self.rsi_short_threshold and rsi_value < self.rsi_short_threshold:
+                    words.append(f"进入超卖({self.rsi_short_threshold}) - 开始加仓信号")
+                    words.append("时机: 首次进入超卖区可观望，深度超卖可加仓")
+
+                # RSI钝化分析 - 商品期货特有
+                if rsi_value > 80:
+                    consecutive_count = 1
+                    check_ix = prev_ix
+                    while check_ix >= 0 and check_ix in self.rsi_data and self.rsi_data[check_ix] > 80:
+                        consecutive_count += 1
+                        check_ix -= 1
+                    if consecutive_count >= 3:
+                        words.append(f"RSI高位钝化({consecutive_count}周期) - 强势行情持续")
+                        words.append("特殊行情: 强趋势行情，可持有但严控风险")
+
+                elif rsi_value < 20:
+                    consecutive_count = 1
+                    check_ix = prev_ix
+                    while check_ix >= 0 and check_ix in self.rsi_data and self.rsi_data[check_ix] < 20:
+                        consecutive_count += 1
+                        check_ix -= 1
+                    if consecutive_count >= 3:
+                        words.append(f"RSI低位钝化({consecutive_count}周期) - 弱势行情持续")
+                        words.append("特殊行情: 弱趋势行情，暂不抄底")
+
+                # 背离检测提示
+                if ix in self.start_bull_indices:
+                    words.append("检测到底背离 - 看涨反转信号")
+                    words.append("策略: 等待价格确认后做多")
+                if ix in self.start_bear_indices:
+                    words.append("检测到顶背离 - 看跌反转信号")
+                    words.append("策略: 等待价格确认后做空")
+
             else:
-                words.append("状态: 正常")
-            
+                # 没有前一个数据时的基本判断
+                if rsi_value >= 80:
+                    words.append("极度超买 - 高度风险区域")
+                elif rsi_value >= 70:
+                    words.append("超买区域 - 谨慎做多")
+                elif rsi_value <= 20:
+                    words.append("极度超卖 - 反弹机会区域")
+                elif rsi_value <= 30:
+                    words.append("超卖区域 - 关注做多")
+                else:
+                    words.append("正常区域 - 结合其他指标")
+
             return "\n".join(words)
-        
-        return f"RSI({self.rsi_window})"
+        else:
+            return f"RSI({self.rsi_window}) - 数据不足"
 
     def clear_all(self) -> None:
         """清除所有数据"""

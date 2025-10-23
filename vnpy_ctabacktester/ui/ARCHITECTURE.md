@@ -180,7 +180,6 @@ redesigned_widget.py:
 
 2. **避免文件混淆**
    - ✅ 使用 `CandleChartDialog`（widget.py）
-   - ❌ 已删除 `EnhancedCandleChartDialog`（enhanced_candle_dialog.py）
 
 3. **增强功能可选性**
    - 所有增强功能都有回退机制
@@ -194,7 +193,6 @@ redesigned_widget.py:
 ## 📝 版本历史
 
 ### v1.0 (2025-01-06) - 架构重组
-- 删除重复文件 `enhanced_candle_dialog.py`
 - 统一使用 `widget.py` 中的 `CandleChartDialog`
 - 明确文件职责和依赖关系
 - 添加完整的文档说明

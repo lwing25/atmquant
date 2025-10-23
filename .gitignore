@@ -30,6 +30,7 @@ ENV/
 .env
 config/*.json
 !config/*.json.example
+config/social_media_local.md
 
 # 数据文件 (使用MySQL数据库，不需要本地数据目录)
 *.db

@@ -17,7 +17,6 @@ CTA回测模块UI组件
 
 注意：
 - CandleChartDialog已经使用EnhancedChartWidget，无需修改
-- 删除了enhanced_candle_dialog.py（功能重复）
 """
 
 import os
@@ -1287,7 +1286,7 @@ class CandleChartDialog(QtWidgets.QDialog):
     4. 自动回退到标准ChartWidget（如果EnhancedChartWidget不可用）
     
     注意：
-    - 这是唯一的K线图表对话框类，不要使用enhanced_candle_dialog.py
+    - 这是唯一的K线图表对话框类
     - EnhancedChartWidget来自core/charts/enhanced_chart_widget.py
     - 如果需要修改图表功能，请修改EnhancedChartWidget，而非此类
     """

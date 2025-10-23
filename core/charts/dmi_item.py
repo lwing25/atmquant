@@ -186,27 +186,215 @@ class DmiItem(ChartItem, ConfigurableIndicator):
         """获取DMI信息文本，包含数值和交易指导"""
         if ix in self.dmi_data:
             pdi, mdi, adx, adxr = self.dmi_data[ix]
-            
+
             # 基础信息
-            words = [
+            info_lines = [
                 f"DMI({self.N},{self.M}):",
                 f"PDI: {pdi:.2f}",
                 f"MDI: {mdi:.2f}",
                 f"ADX: {adx:.2f}",
                 f"ADXR: {adxr:.2f}",
             ]
-            
-            # 添加状态信息
-            if pdi > mdi:
-                words.append("趋势: 多头")
-            elif mdi > pdi:
-                words.append("趋势: 空头")
+
+            # 获取前一个数据用于趋势判断
+            prev_ix = ix - 1
+            if prev_ix in self.dmi_data:
+                prev_pdi, prev_mdi, prev_adx, prev_adxr = self.dmi_data[prev_ix]
+
+                # PDI与MDI对比分析 - 方向判断
+                pdi_mdi_diff = abs(pdi - mdi)
+
+                if pdi > mdi:
+                    info_lines.append(f"趋势方向: 多头占优 (PDI>MDI)")
+                    if pdi_mdi_diff > 20:
+                        info_lines.append(f"多头强度: 极强 (差值{pdi_mdi_diff:.1f})")
+                        info_lines.append("市场状态: 强势多头行情")
+                    elif pdi_mdi_diff > 10:
+                        info_lines.append(f"多头强度: 较强 (差值{pdi_mdi_diff:.1f})")
+                        info_lines.append("市场状态: 稳定多头行情")
+                    else:
+                        info_lines.append(f"多头强度: 温和 (差值{pdi_mdi_diff:.1f})")
+                        info_lines.append("市场状态: 多头略占上风")
+
+                elif mdi > pdi:
+                    info_lines.append(f"趋势方向: 空头占优 (MDI>PDI)")
+                    if pdi_mdi_diff > 20:
+                        info_lines.append(f"空头强度: 极强 (差值{pdi_mdi_diff:.1f})")
+                        info_lines.append("市场状态: 强势空头行情")
+                    elif pdi_mdi_diff > 10:
+                        info_lines.append(f"空头强度: 较强 (差值{pdi_mdi_diff:.1f})")
+                        info_lines.append("市场状态: 稳定空头行情")
+                    else:
+                        info_lines.append(f"空头强度: 温和 (差值{pdi_mdi_diff:.1f})")
+                        info_lines.append("市场状态: 空头略占上风")
+                else:
+                    info_lines.append("趋势方向: 多空平衡")
+                    info_lines.append("市场状态: 方向不明，观望为主")
+
+                # PDI和MDI交叉分析 - 关键买卖信号
+                if prev_pdi <= prev_mdi and pdi > mdi:
+                    info_lines.append("PDI上穿MDI - 黄金交叉")
+                    if adx > 25:
+                        info_lines.append("信号强度: 强 (ADX>25)")
+                        info_lines.append("操作: 积极做多，趋势启动")
+                    elif adx > 20:
+                        info_lines.append("信号强度: 中等 (ADX>20)")
+                        info_lines.append("操作: 谨慎做多，观察确认")
+                    else:
+                        info_lines.append("信号强度: 弱 (ADX<20)")
+                        info_lines.append("操作: 等待ADX上升确认")
+
+                elif prev_pdi >= prev_mdi and pdi < mdi:
+                    info_lines.append("MDI上穿PDI - 死亡交叉")
+                    if adx > 25:
+                        info_lines.append("信号强度: 强 (ADX>25)")
+                        info_lines.append("操作: 积极做空，趋势启动")
+                    elif adx > 20:
+                        info_lines.append("信号强度: 中等 (ADX>20)")
+                        info_lines.append("操作: 谨慎做空，观察确认")
+                    else:
+                        info_lines.append("信号强度: 弱 (ADX<20)")
+                        info_lines.append("操作: 等待ADX上升确认")
+
+                # ADX趋势强度分析 - 核心指标
+                if adx > 50:
+                    info_lines.append("趋势强度: 极强趋势 (ADX>50)")
+                    info_lines.append("特征: 单边行情，顺势为王")
+                    if pdi > mdi:
+                        info_lines.append("策略: 坚定持有多单，不轻易止盈")
+                    else:
+                        info_lines.append("策略: 坚定持有空单，不轻易止盈")
+                elif adx > 40:
+                    info_lines.append("趋势强度: 强趋势 (ADX>40)")
+                    info_lines.append("特征: 明确趋势，顺势操作")
+                    if pdi > mdi:
+                        info_lines.append("策略: 持有多单，回调加仓")
+                    else:
+                        info_lines.append("策略: 持有空单，反弹加仓")
+                elif adx > 25:
+                    info_lines.append("趋势强度: 中等趋势 (ADX>25)")
+                    info_lines.append("特征: 趋势形成，可顺势操作")
+                    if pdi > mdi:
+                        info_lines.append("策略: 做多为主，注意止损")
+                    else:
+                        info_lines.append("策略: 做空为主，注意止损")
+                elif adx > 20:
+                    info_lines.append("趋势强度: 弱趋势 (ADX>20)")
+                    info_lines.append("特征: 趋势不明确")
+                    info_lines.append("策略: 谨慎操作，轻仓为主")
+                else:
+                    info_lines.append("趋势强度: 无趋势 (ADX<20)")
+                    info_lines.append("特征: 震荡市场，无明确方向")
+                    info_lines.append("策略: 区间操作或观望")
+
+                # ADX变化趋势分析
+                adx_change = adx - prev_adx
+                if abs(adx_change) > 3:
+                    if adx_change > 0:
+                        info_lines.append(f"ADX急速上升 (+{adx_change:.1f}) - 趋势强化")
+                        info_lines.append("信号: 趋势行情启动或加速")
+                    else:
+                        info_lines.append(f"ADX急速下降 ({adx_change:.1f}) - 趋势减弱")
+                        info_lines.append("信号: 趋势行情衰竭，准备调整")
+                elif abs(adx_change) > 1:
+                    if adx_change > 0:
+                        info_lines.append(f"ADX稳步上升 (+{adx_change:.1f})")
+                    else:
+                        info_lines.append(f"ADX稳步下降 ({adx_change:.1f})")
+
+                # ADX与ADXR对比 - 趋势加速或减速判断
+                adx_adxr_diff = adx - adxr
+                if abs(adx_adxr_diff) > 5:
+                    if adx_adxr_diff > 0:
+                        info_lines.append(f"ADX>ADXR (差值{adx_adxr_diff:.1f}) - 趋势加速")
+                        info_lines.append("动能: 新趋势力量强劲")
+                    else:
+                        info_lines.append(f"ADX<ADXR (差值{abs(adx_adxr_diff):.1f}) - 趋势减速")
+                        info_lines.append("动能: 趋势力量衰减")
+
+                # ADX拐点分析 - 重要转折信号
+                if prev_adx > adx and adx > 40:
+                    info_lines.append("ADX高位回落 - 趋势衰竭信号")
+                    info_lines.append("警惕: 强趋势可能进入尾声")
+                    info_lines.append("操作: 准备获利了结")
+                elif prev_adx < adx and adx > 25 and prev_adx < 20:
+                    info_lines.append("ADX突破20 - 趋势启动信号")
+                    info_lines.append("机会: 新趋势行情开始")
+                    info_lines.append("操作: 顺势建仓")
+
+                # PDI和MDI的绝对位置分析
+                if pdi > 40 and mdi < 20:
+                    info_lines.append("PDI极强MDI极弱 - 单边多头")
+                    info_lines.append("市场: 典型牛市特征")
+                elif mdi > 40 and pdi < 20:
+                    info_lines.append("MDI极强PDI极弱 - 单边空头")
+                    info_lines.append("市场: 典型熊市特征")
+                elif pdi > 30 and mdi > 30:
+                    info_lines.append("PDI和MDI双高 - 震荡激烈")
+                    info_lines.append("市场: 多空争夺激烈")
+                elif pdi < 20 and mdi < 20:
+                    info_lines.append("PDI和MDI双低 - 趋势不明")
+                    info_lines.append("市场: 盘整阶段，方向未定")
+
+                # PDI/MDI变化率分析
+                pdi_change = pdi - prev_pdi
+                mdi_change = mdi - prev_mdi
+
+                if abs(pdi_change) > 5 or abs(mdi_change) > 5:
+                    if pdi_change > 5:
+                        info_lines.append(f"PDI急升 (+{pdi_change:.1f}) - 多头力量激增")
+                    elif pdi_change < -5:
+                        info_lines.append(f"PDI急降 ({pdi_change:.1f}) - 多头力量减弱")
+
+                    if mdi_change > 5:
+                        info_lines.append(f"MDI急升 (+{mdi_change:.1f}) - 空头力量激增")
+                    elif mdi_change < -5:
+                        info_lines.append(f"MDI急降 ({mdi_change:.1f}) - 空头力量减弱")
+
+                # DMI经典组合信号
+                if pdi > mdi and adx > 25 and adx > adxr:
+                    info_lines.append("经典多头组合 - PDI>MDI且ADX>25且上升")
+                    info_lines.append("最佳信号: 积极做多")
+                elif mdi > pdi and adx > 25 and adx > adxr:
+                    info_lines.append("经典空头组合 - MDI>PDI且ADX>25且上升")
+                    info_lines.append("最佳信号: 积极做空")
+                elif adx < 20 and abs(pdi - mdi) < 5:
+                    info_lines.append("经典震荡组合 - ADX<20且PDI≈MDI")
+                    info_lines.append("策略建议: 观望或区间操作")
+
+                # 趋势持续性判断
+                if adx > 25:
+                    # 检查连续周期的ADX
+                    consecutive_adx_high = 1
+                    check_ix = prev_ix
+                    while check_ix >= 0 and check_ix in self.dmi_data:
+                        if self.dmi_data[check_ix][2] > 25:
+                            consecutive_adx_high += 1
+                            check_ix -= 1
+                        else:
+                            break
+
+                    if consecutive_adx_high >= 5:
+                        info_lines.append(f"趋势持续 ({consecutive_adx_high}周期) - 趋势成熟")
+                        info_lines.append("提示: 长期趋势，注意顶底背离")
+
             else:
-                words.append("趋势: 平衡")
-            
-            return "\n".join(words)
-        
-        return f"DMI({self.N},{self.M})"
+                # 没有前一个数据时的基本判断
+                if pdi > mdi:
+                    info_lines.append("趋势: 多头")
+                elif mdi > pdi:
+                    info_lines.append("趋势: 空头")
+                else:
+                    info_lines.append("趋势: 平衡")
+
+                if adx > 25:
+                    info_lines.append("强度: 有趋势")
+                else:
+                    info_lines.append("强度: 弱势或震荡")
+
+            return "\n".join(info_lines)
+
+        return f"DMI({self.N},{self.M}) - 数据不足"
     
     def clear_all(self) -> None:
         """清除所有数据"""
