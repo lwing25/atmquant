@@ -72,5 +72,6 @@ Desktop.ini
 *.temp
 *.bak
 *.backup
+*.zip
 articles/
 CLAUDE.md
