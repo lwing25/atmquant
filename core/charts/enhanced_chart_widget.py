@@ -254,16 +254,16 @@ class EnhancedChartWidget(ChartWidget):
     def __init__(self, parent: QtWidgets.QWidget = None):
         # 首先初始化配置，这些在父类初始化之前设置
         self.main_indicators = {
-            "boll": [BollItem, "boll", True, True],
-            "sma": [MultiSmaItem, "sma", True, True],
-            "ema": [MultiEmaItem, "ema", True, True],
+            "boll": [BollItem, "boll", False, True],
+            "sma": [MultiSmaItem, "sma", False, True],
+            "ema": [MultiEmaItem, "ema", False, True],
         }
         
         self.sub_indicators = {
             "volume": [VolumeItem, "volume", True, 120, 200, False],
             "macd": [Macd3Item, "macd", True, 120, 180, True],
             "rsi": [RsiItem, "rsi", False, 100, 150, True],
-            "dmi": [DmiItem, "dmi", False, 100, 150, True],
+            "dmi": [DmiItem, "dmi", True, 100, 150, True],
         }
         
         # 记录指标可见状态
