@@ -20,7 +20,7 @@ class MultiSmaItem(CandleItem, ConfigurableIndicator):
     绘制多条简单移动平均线(SMA)的类 - 参考原始代码样式
     """
 
-    def __init__(self, manager, periods: Tuple[int, ...] = (5, 10, 20, 60)):
+    def __init__(self, manager, periods: Tuple[int, ...] = (20, 60, 100)):
         """
         初始化
         """
@@ -524,5 +524,5 @@ class MultiSmaItem(CandleItem, ConfigurableIndicator):
     def _get_default_config(self) -> Dict[str, Any]:
         """获取默认配置"""
         return {
-            'periods': "5,10,20,60"
+            'periods': "20,60,100"
         }
