@@ -181,10 +181,10 @@ class CandleItem(ChartItem):
         # Set painter color
         if bar.close_price >= bar.open_price:
             painter.setPen(self._up_pen)
-            painter.setBrush(self._black_brush)
+            painter.setBrush(self._up_brush)  # 阳线实心
         else:
             painter.setPen(self._down_pen)
-            painter.setBrush(self._down_brush)
+            painter.setBrush(self._down_brush)  # 阴线实心
 
         # Draw candle shadow
         if bar.high_price > bar.low_price:

@@ -288,7 +288,11 @@ class EnhancedChartWidget(ChartWidget):
 
         # 周期切换回调（用于通知外部组件周期已切换）
         self.on_interval_changed_callback = None
-        
+
+        # 双击专注模式相关状态
+        self.focus_mode = None  # None: 正常模式, "main": 只显示主图, "plot_name": 只显示某个副图
+        self.saved_plot_visibility = {}  # 保存进入focus模式前的副图可见性状态
+
         # 调用父类初始化
         super().__init__(parent)
         
@@ -770,67 +774,96 @@ class EnhancedChartWidget(ChartWidget):
         return result
     
     def _setup_double_click_handlers(self):
-        """设置附图双击事件处理"""
+        """设置主图和附图的双击事件处理"""
+        # 为主图（candle）设置双击事件
+        candle_plot = self._plots.get("candle")
+        if candle_plot:
+            # 保存原始的双击事件处理函数
+            original_double_click = getattr(candle_plot, 'mouseDoubleClickEvent', None)
+
+            def main_double_click_handler(event):
+                # 先调用原始处理函数（如果有）
+                if original_double_click:
+                    original_double_click(event)
+                # 切换主图专注模式
+                self._toggle_main_focus()
+
+            candle_plot.mouseDoubleClickEvent = main_double_click_handler
+
+        # 为每个副图设置双击事件处理
         for plot_name, plot in self._plots.items():
             if plot_name != "candle":  # 跳过主图
                 # 为plot设置双击事件处理
                 original_double_click = getattr(plot, 'mouseDoubleClickEvent', None)
-                
+
                 def create_double_click_handler(name, original_handler):
                     def double_click_handler(event):
                         if original_handler:
                             original_handler(event)
-                        self._toggle_plot_size(name)
+                        # 切换该副图的专注模式
+                        self._toggle_sub_focus(name)
                     return double_click_handler
-                
+
                 plot.mouseDoubleClickEvent = create_double_click_handler(plot_name, original_double_click)
-    
-    def _toggle_plot_size(self, plot_name: str):
-        """切换附图的大小状态（放大/恢复原始大小）"""
-        if plot_name not in self._plots:
-            return
-        
-        # 保存当前的可见性状态
-        current_visibility = {}
-        for name, plot in self._plots.items():
-            current_visibility[name] = plot.isVisible()
-        
-        plot = self._plots[plot_name]
-        
-        if plot_name in self.enlarged_plots:
-            # 恢复原始大小
-            if plot_name in self.original_heights:
-                original = self.original_heights[plot_name]
-                minimum_height = original["minimum_height"]
-                maximum_height = original["maximum_height"]
-                
-                plot.setMinimumHeight(minimum_height)
-                if maximum_height:
-                    plot.setMaximumHeight(maximum_height)
-                else:
-                    plot.setMaximumHeight(16777215)
-            
-            self.enlarged_plots.remove(plot_name)
+
+    def _toggle_main_focus(self):
+        """切换主图专注模式（隐藏/显示所有副图）"""
+        if self.focus_mode == "main":
+            # 当前是主图专注模式，恢复所有副图
+            self._restore_plot_visibility()
+            self.focus_mode = None
         else:
-            # 放大
-            self.enlarged_plots.add(plot_name)
-            plot.setMinimumHeight(400)
-            plot.setMaximumHeight(16777215)
-        
-        # 更新布局
-        self._layout.updateGeometry()
-        
-        # 恢复可见性状态
-        for name, visible in current_visibility.items():
-            if name in self._plots:
+            # 进入主图专注模式，隐藏所有副图
+            self._save_plot_visibility()
+            self._hide_all_sub_plots()
+            self.focus_mode = "main"
+
+    def _toggle_sub_focus(self, plot_name: str):
+        """切换副图专注模式（只显示该副图，隐藏其他副图）"""
+        if self.focus_mode == plot_name:
+            # 当前已经是该副图的专注模式，恢复所有副图
+            self._restore_plot_visibility()
+            self.focus_mode = None
+        else:
+            # 进入该副图的专注模式，隐藏其他副图
+            self._save_plot_visibility()
+            self._hide_all_sub_plots_except(plot_name)
+            self.focus_mode = plot_name
+
+    def _save_plot_visibility(self):
+        """保存当前所有副图的可见性状态"""
+        self.saved_plot_visibility = {}
+        for plot_name, plot in self._plots.items():
+            if plot_name != "candle":
+                self.saved_plot_visibility[plot_name] = plot.isVisible()
+
+    def _restore_plot_visibility(self):
+        """恢复之前保存的副图可见性状态"""
+        for plot_name, visible in self.saved_plot_visibility.items():
+            if plot_name in self._plots:
                 if visible:
-                    self._plots[name].show()
+                    self._plots[plot_name].show()
                 else:
-                    self._plots[name].hide()
-    
-        else:
-            QtWidgets.QMessageBox.information(self, "提示", "此指标暂不支持配置")
-    
+                    self._plots[plot_name].hide()
+        self._layout.updateGeometry()
+
+    def _hide_all_sub_plots(self):
+        """隐藏所有副图"""
+        for plot_name, plot in self._plots.items():
+            if plot_name != "candle":
+                plot.hide()
+        self._layout.updateGeometry()
+
+    def _hide_all_sub_plots_except(self, except_plot_name: str):
+        """隐藏除了指定副图之外的所有副图"""
+        for plot_name, plot in self._plots.items():
+            if plot_name != "candle":
+                if plot_name == except_plot_name:
+                    plot.show()
+                else:
+                    plot.hide()
+        self._layout.updateGeometry()
+
     def update_history(self, history: List[BarData]) -> None:
         """更新历史数据"""
         # 保存原始1分钟K线数据
@@ -1246,3 +1279,97 @@ class EnhancedChartWidget(ChartWidget):
                     print(f"周期切换回调执行失败: {e}")
                     import traceback
                     traceback.print_exc()
+
+    def _update_plot_limits(self) -> None:
+        """
+        重写父类方法，允许x轴和y轴都可以扩展到数据范围之外
+        """
+        for item, plot in self._item_plot_map.items():
+            min_value, max_value = item.get_y_range()
+
+            # 计算Y轴的扩展范围，允许向上向下都有足够的空间
+            y_range = max_value - min_value
+            y_extend = y_range * 2.0  # 允许向上向下各扩展200%的数据范围
+
+            # 获取ViewBox并设置限制，允许x轴和y轴都可以扩展到数据范围之外
+            view = plot.getViewBox()
+            if view:
+                view.setLimits(
+                    xMin=-1,
+                    xMax=self._manager.get_count() + 100,  # 允许X轴延伸100个单位
+                    yMin=min_value - y_extend,  # 允许Y轴向下扩展
+                    yMax=max_value + y_extend   # 允许Y轴向上扩展
+                )
+
+    def _update_x_range(self) -> None:
+        """
+        重写父类方法，支持扩展的x轴范围
+        """
+        max_ix: int = self._right_ix
+        min_ix: int = self._right_ix - self._bar_count
+
+        for plot in self._plots.values():
+            view = plot.getViewBox()
+            if view:
+                view.setRange(xRange=(min_ix, max_ix), padding=0.03)
+
+    def _on_key_right(self) -> None:
+        """
+        重写父类方法，允许向右移动超出数据范围
+        """
+        self._right_ix += 1
+        # 允许超出数据范围，但设置一个合理的最大值
+        data_count = self._manager.get_count()
+        max_extend = 50  # 最多延伸50个单位
+        # 不限制向右扩展（在合理范围内）
+        if self._right_ix > data_count - 1 + max_extend:
+            self._right_ix = data_count - 1 + max_extend
+
+        self._update_x_range()
+        if self._cursor:
+            # 直接更新cursor位置
+            if self._cursor._x < data_count - 1:
+                # cursor还在数据范围内，可以正常移动
+                self._cursor._x += 1
+                bar = self._manager.get_bar(self._cursor._x)
+                if bar:
+                    self._cursor._y = bar.close_price
+                    self._cursor._update_line()
+                    self._cursor._update_label()
+                self._cursor.update_info()
+            else:
+                # cursor已经超出数据范围，保持在最后一个有效位置
+                self._cursor._x = data_count - 1
+                self._cursor.update_info()
+
+    def _on_key_left(self) -> None:
+        """
+        重写父类方法，向左移动图表
+        """
+        self._right_ix -= 1
+
+        # 当数据量少于显示数量时，允许适当的向左移动
+        data_count = self._manager.get_count()
+        if data_count <= self._bar_count:
+            # 如果数据量少于显示数量，允许移动但不能让左边界超出太多
+            min_right_ix = data_count - 1  # 至少要显示最后一根数据
+            self._right_ix = max(self._right_ix, min_right_ix)
+        else:
+            # 如果数据量大于显示数量，使用标准逻辑
+            self._right_ix = max(self._right_ix, self._bar_count)
+
+        self._update_x_range()
+        if self._cursor:
+            # 直接更新cursor位置
+            if self._cursor._x > 0:
+                self._cursor._x -= 1
+                bar = self._manager.get_bar(self._cursor._x)
+                if bar:
+                    self._cursor._y = bar.close_price
+                    self._cursor._update_line()
+                    self._cursor._update_label()
+                self._cursor.update_info()
+            else:
+                # cursor已经在最左边，保持在位置0
+                self._cursor._x = 0
+                self._cursor.update_info()
