@@ -328,10 +328,10 @@ class EnhancedChartWidget(ChartWidget):
                         viewbox.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing, True)
                         viewbox.setRenderHint(QtGui.QPainter.RenderHint.TextAntialiasing, True)
                         viewbox.setRenderHint(QtGui.QPainter.RenderHint.SmoothPixmapTransform, True)
-                        
-        except Exception as e:
-            print(f"设置高质量渲染时出错: {e}")
-    
+
+        except Exception:
+            pass  # 静默失败
+
     def _apply_high_quality_to_plots(self):
         """将高质量渲染设置应用到所有绘图区域"""
         try:
@@ -342,17 +342,17 @@ class EnhancedChartWidget(ChartWidget):
                         # 设置高质量变换
                         if hasattr(viewbox, 'setAspectLocked'):
                             viewbox.setAspectLocked(False)
-                        
+
                         # 对于ExtendableViewBox，尝试设置其他质量选项
                         if hasattr(viewbox, 'setAntialiasing'):
                             viewbox.setAntialiasing(True)
-                        
+
                         # 设置绘图项目的质量
                         if hasattr(plot_item, 'setAntialiasing'):
                             plot_item.setAntialiasing(True)
-                            
-        except Exception as e:
-            print(f"应用高质量渲染到绘图区域时出错: {e}")
+
+        except Exception:
+            pass  # 静默失败
     
     def _init_charts(self):
         """初始化图表结构"""
@@ -503,7 +503,7 @@ class EnhancedChartWidget(ChartWidget):
             
             # 如果指标可配置，添加配置按钮
             if len(config) > 3 and config[3]:  # 可配置
-                config_btn = QtWidgets.QPushButton("⚙️")
+                config_btn = QtWidgets.QPushButton("...")  # 配置按钮（纯ASCII，避免emoji崩溃）
                 config_btn.setFixedSize(20, 20)
                 config_btn.setStyleSheet("""
                     QPushButton {
@@ -581,7 +581,7 @@ class EnhancedChartWidget(ChartWidget):
             
             # 如果指标可配置，添加配置按钮
             if len(config) > 5 and config[5]:  # 可配置
-                config_btn = QtWidgets.QPushButton("⚙️")
+                config_btn = QtWidgets.QPushButton("...")  # 配置按钮（纯ASCII，避免emoji崩溃）
                 config_btn.setFixedSize(20, 20)
                 config_btn.setStyleSheet("""
                     QPushButton {
@@ -627,11 +627,10 @@ class EnhancedChartWidget(ChartWidget):
         
         item_class, item_key, default_visible, configurable = self.main_indicators[name]
         is_checked = state == QtCore.Qt.Checked.value
-        
+
         if is_checked:
             # 如果要显示但指标不存在，重新创建
             if item_key not in self._items:
-                print(f"重新创建指标: {name}")
                 self.add_item(item_class, item_key, "candle")
                 # 立即更新数据
                 history = self._manager.get_all_bars()
@@ -641,7 +640,6 @@ class EnhancedChartWidget(ChartWidget):
                     self._items[item_key].update()
             else:
                 # 如果存在，确保它在绘图区域中
-                print(f"重新显示指标: {name}")
                 plot = self._plots["candle"]
                 item = self._items[item_key]
                 # 确保添加到绘图区域
@@ -657,7 +655,6 @@ class EnhancedChartWidget(ChartWidget):
         else:
             # 移除指标但保留在_items中以便重新显示
             if item_key in self._items:
-                print(f"隐藏指标: {name}")
                 plot = self._plots["candle"]
                 item = self._items[item_key]
                 plot.removeItem(item)
@@ -1204,81 +1201,60 @@ class EnhancedChartWidget(ChartWidget):
         # 然后设置当前点击的按钮为选中状态
         if clicked_btn:
             clicked_btn.setChecked(True)
-        
+
         # 如果有基础数据，重新聚合并更新图表
         if self.base_minute_bars:
-            print(f"\n切换到周期: {self._actual_interval}")
-            
             if self._actual_interval == "1m":
                 # 显示原始1分钟数据
                 bars_to_display = self.base_minute_bars
             else:
                 # 聚合数据
                 bars_to_display = self._aggregate_bars(self.base_minute_bars, self._actual_interval)
-            
-            print(f"聚合后K线数量: {len(bars_to_display)}")
-            
-            # 第一步：清空所有指标的数据缓存
-            print("清空指标缓存...")
+
+            # 清空所有指标的数据缓存
             for item_name, item in self._items.items():
                 if hasattr(item, 'clear_all'):
                     try:
                         item.clear_all()
-                    except Exception as e:
-                        print(f"清空指标 {item_name} 时出错: {e}")
-            
-            # 第二步：清空管理器数据
-            print("清空K线管理器...")
+                    except Exception:
+                        pass  # 静默失败，避免影响整体流程
+
+            # 清空管理器数据
             self._manager.clear_all()
-            
-            # 第三步：重新添加数据到管理器
-            print("重新加载K线数据...")
+
+            # 重新添加数据到管理器
             for bar in bars_to_display:
                 self._manager.update_bar(bar)
-            
-            # 第四步：强制更新所有指标 - 确保它们使用新的数据
-            print("更新所有指标...")
+
+            # 强制更新所有指标
             for item_name, item in self._items.items():
                 try:
-                    # 更新指标数据
                     if hasattr(item, 'update_history'):
                         item.update_history(bars_to_display)
-                        print(f"  ✓ {item_name} 更新完成")
-                    
-                    # 强制重绘
                     if hasattr(item, 'update'):
                         item.update()
-                except Exception as e:
-                    print(f"  ✗ 更新指标 {item_name} 时出错: {e}")
-                    import traceback
-                    traceback.print_exc()
-            
-            # 第五步：更新图表范围
-            print("更新图表范围...")
+                except Exception:
+                    pass  # 静默失败，避免影响整体流程
+
+            # 更新图表范围
             self._update_plot_limits()
-            
-            # 第六步：移动到最右侧
+
+            # 移动到最右侧
             self.move_to_right()
-            
-            # 第七步：强制刷新所有绘图区域
-            print("刷新所有绘图区域...")
+
+            # 强制刷新所有绘图区域
             for plot_name, plot in self._plots.items():
                 plot.update()
-            
-            # 第八步：刷新整个组件
+
+            # 刷新整个组件
             self.update()
 
-            print("✓ 周期切换完成\n")
-
-            # 第九步：通知外部组件周期已切换（如CandleChartDialog）
+            # 通知外部组件周期已切换
             if self.on_interval_changed_callback:
                 try:
-                    print("调用周期切换回调...")
                     self.on_interval_changed_callback(bars_to_display, self._actual_interval)
-                except Exception as e:
-                    print(f"周期切换回调执行失败: {e}")
-                    import traceback
-                    traceback.print_exc()
+                except Exception:
+                    pass  # 静默失败，避免影响整体流程
 
     def _update_plot_limits(self) -> None:
         """

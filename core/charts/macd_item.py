@@ -178,10 +178,9 @@ class Macd3Item(ChartItem, ConfigurableIndicator):
                 # 更新缓存数据
                 for n in range(start_idx, len(diffs)):
                     self.macd_data[n] = [diffs[n], deas[n], macds[n], slow_deas[n]]
-                    
-            except Exception as e:
-                # 出现异常时记录并返回无效值
-                print(f"MACD计算错误: {str(e)}")
+
+            except Exception:
+                # 出现异常时返回无效值（静默失败）
                 self.macd_data[ix] = invalid_value
                 return invalid_value
 

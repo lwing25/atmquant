@@ -103,9 +103,9 @@ class DmiItem(ChartItem, ConfigurableIndicator):
                 for n in range(len(adx)):
                     if not (np.isnan(pdi[n]) or np.isnan(mdi[n]) or np.isnan(adx[n]) or np.isnan(adxr[n])):
                         self.dmi_data[n] = (pdi[n], mdi[n], adx[n], adxr[n])
-            except Exception as e:
-                print(f"DMI计算错误: {str(e)}")
-            
+            except Exception:
+                pass  # 静默失败
+
             self._to_update = False  # 重置更新标记
 
         # 返回已计算的值

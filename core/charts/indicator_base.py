@@ -139,9 +139,9 @@ class ConfigurableIndicator:
                         config[key] = widget.isChecked()
                 
                 self.apply_config(config)
-                
-                # 显示成功提示
-                ok_button.setText("✓ 已应用")
+
+                # 显示成功提示（避免emoji导致macOS崩溃）
+                ok_button.setText("[OK] 已应用")
                 ok_button.setStyleSheet("QPushButton { background-color: #4CAF50; color: white; }")
                 
                 # 2秒后恢复按钮

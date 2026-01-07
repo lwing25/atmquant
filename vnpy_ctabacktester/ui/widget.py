@@ -58,6 +58,16 @@ from ..engine import (
 # 导入重新设计的现代化界面（可选）
 from .redesigned_widget import RedesignedBacktesterManager
 
+# 导入渐进式测试版本（用于排查问题）
+from .test_versions import (
+    TestVersion1,
+    TestVersion2,
+    TestVersion3,
+    TestVersion4,
+    TestVersion5,
+    TestVersion6,
+)
+
 # 导入增强的统计监控器和优化结果显示器
 try:
     from .enhanced_widget import EnhancedStatisticsMonitor, EnhancedOptimizationResultMonitor
@@ -90,10 +100,14 @@ class OriginalBacktesterManager(QtWidgets.QWidget):
 
         self.target_display: str = ""
 
+        # 延迟初始化标志，避免 Qt + multiprocessing 冲突（macOS bus error）
+        self._engine_initialized: bool = False
+
         self.init_ui()
         self.register_event()
-        self.backtester_engine.init_engine()
-        self.init_strategy_settings()
+        # 注释掉：延迟到真正需要时才初始化引擎（避免 Qt + multiprocessing 冲突）
+        # self.backtester_engine.init_engine()
+        # self.init_strategy_settings()
         self.load_backtesting_setting()
 
     def init_strategy_settings(self) -> None:
@@ -106,6 +120,25 @@ class OriginalBacktesterManager(QtWidgets.QWidget):
             self.settings[class_name] = setting
 
         self.class_combo.addItems(self.class_names)
+
+    def ensure_engine_initialized(self) -> None:
+        """
+        确保引擎已初始化（延迟初始化模式）
+
+        这个方法解决了 macOS 上的 Qt + multiprocessing 冲突问题：
+        - 在 __init__() 中过早初始化引擎会触发多进程池创建
+        - macOS 的 spawn 模式会尝试序列化 Qt 对象到子进程
+        - Qt 对象不可序列化，导致 bus error 和信号量泄漏
+
+        延迟初始化策略：
+        - 构造函数中不初始化引擎
+        - 在真正需要时（用户点击操作按钮）才初始化
+        - 使用标志位确保只初始化一次
+        """
+        if not self._engine_initialized:
+            self.backtester_engine.init_engine()
+            self.init_strategy_settings()
+            self._engine_initialized = True
 
     def init_ui(self) -> None:
         """"""
@@ -352,6 +385,9 @@ class OriginalBacktesterManager(QtWidgets.QWidget):
 
     def start_backtesting(self) -> None:
         """"""
+        # 确保引擎已初始化（延迟初始化）
+        self.ensure_engine_initialized()
+
         class_name: str = self.class_combo.currentText()
         if not class_name:
             self.write_log(_("请选择要回测的策略"))
@@ -431,6 +467,9 @@ class OriginalBacktesterManager(QtWidgets.QWidget):
 
     def start_optimization(self) -> None:
         """"""
+        # 确保引擎已初始化（延迟初始化）
+        self.ensure_engine_initialized()
+
         class_name: str = self.class_combo.currentText()
         vt_symbol: str = self.symbol_line.text()
         interval: str = self.interval_combo.currentText()
@@ -571,6 +610,9 @@ class OriginalBacktesterManager(QtWidgets.QWidget):
 
     def reload_strategy_class(self) -> None:
         """"""
+        # 确保引擎已初始化（延迟初始化）
+        self.ensure_engine_initialized()
+
         self.backtester_engine.reload_strategy_class()
 
         current_strategy_name: str = self.class_combo.currentText()
@@ -1324,22 +1366,16 @@ class CandleChartDialog(QtWidgets.QDialog):
         try:
             from core.charts import EnhancedChartWidget
             self.chart = EnhancedChartWidget()
-            print("✓ 使用增强版K线图表 (EnhancedChartWidget)")
-        except ImportError as e:
+        except ImportError:
             # 如果增强图表不可用，回退到标准图表
-            print(f"Warning: EnhancedChartWidget not available, falling back to standard ChartWidget")
-            print(f"ImportError: {e}")
             self.chart = ChartWidget()
             self.chart.add_plot("candle", hide_x_axis=True)
             self.chart.add_plot("volume", maximum_height=200)
             self.chart.add_item(CandleItem, "candle", "candle")
             self.chart.add_item(VolumeItem, "volume", "volume")
             self.chart.add_cursor()
-        except Exception as e:
+        except Exception:
             # 捕获其他异常
-            print(f"Error loading EnhancedChartWidget: {e}")
-            import traceback
-            traceback.print_exc()
             self.chart = ChartWidget()
             self.chart.add_plot("candle", hide_x_axis=True)
             self.chart.add_plot("volume", maximum_height=200)
@@ -1352,9 +1388,7 @@ class CandleChartDialog(QtWidgets.QDialog):
             from core.charts import DualChartWidget
             self.dual_chart = DualChartWidget(left_period="15m", right_period="1h")
             self.dual_chart.hide()  # 默认隐藏
-            print("✓ 双图组件创建成功")
         except ImportError as e:
-            print(f"Warning: DualChartWidget not available: {e}")
             self.dual_chart = None
 
         # 创建四图组件（但默认不显示）
@@ -1367,9 +1401,7 @@ class CandleChartDialog(QtWidgets.QDialog):
                 bottom_right_period="d"
             )
             self.quad_chart.hide()  # 默认隐藏
-            print("✓ 四图组件创建成功")
         except ImportError as e:
-            print(f"Warning: QuadChartWidget not available: {e}")
             self.quad_chart = None
 
         # 创建顶部工具栏
@@ -1787,7 +1819,6 @@ class CandleChartDialog(QtWidgets.QDialog):
             # 单图模式
             self.chart.show()
             self.is_dual_mode = False
-            print("✓ 切换到单图模式")
 
         elif mode_id == 1:
             # 双图模式
@@ -1812,7 +1843,6 @@ class CandleChartDialog(QtWidgets.QDialog):
                 if self.trade_data:
                     self._draw_dual_chart_trades()
 
-            print("✓ 切换到双图模式")
 
         elif mode_id == 2:
             # 四图模式
@@ -1836,7 +1866,6 @@ class CandleChartDialog(QtWidgets.QDialog):
                 if self.trade_data:
                     self._draw_quad_chart_trades()
 
-            print("✓ 切换到四图模式")
 
     def _activate_dual_chart_period_buttons(self):
         """激活双图对应的周期按钮"""
@@ -1863,7 +1892,6 @@ class CandleChartDialog(QtWidgets.QDialog):
                         btn.setChecked(False)
                     # 激活对应按钮
                     self.dual_chart.left_chart.interval_buttons[button_key].setChecked(True)
-                    print(f"✓ 激活左侧图表周期按钮: {left_period}")
 
             # 激活右侧图表的周期按钮
             if right_period in period_button_map and hasattr(self.dual_chart.right_chart, 'interval_buttons'):
@@ -1874,10 +1902,9 @@ class CandleChartDialog(QtWidgets.QDialog):
                         btn.setChecked(False)
                     # 激活对应按钮
                     self.dual_chart.right_chart.interval_buttons[button_key].setChecked(True)
-                    print(f"✓ 激活右侧图表周期按钮: {right_period}")
 
-        except Exception as e:
-            print(f"激活周期按钮失败: {e}")
+        except Exception:
+            pass  # 静默失败
 
     def _activate_quad_chart_period_buttons(self):
         """激活四图对应的周期按钮"""
@@ -1906,10 +1933,9 @@ class CandleChartDialog(QtWidgets.QDialog):
                             btn.setChecked(False)
                         # 激活对应按钮
                         chart.interval_buttons[button_key].setChecked(True)
-                        print(f"✓ 激活{chart_name}图表周期按钮: {period}")
 
         except Exception as e:
-            print(f"激活四图周期按钮失败: {e}")
+            pass  # 静默失败
 
     def _draw_quad_chart_trades(self):
         """在四图上绘制交易连线"""
@@ -1918,16 +1944,13 @@ class CandleChartDialog(QtWidgets.QDialog):
             for chart_name, chart in self.quad_chart.charts.items():
                 bars = chart._manager.get_all_bars()
                 if not bars:
-                    print(f"{chart_name}图表K线数据为空，跳过")
                     continue
 
                 # 为每个图表绘制交易连线
                 self._draw_trades_on_chart(chart, bars, chart_name)
 
-            print("✓ 四图交易连线绘制完成")
 
         except Exception as e:
-            print(f"绘制四图交易连线失败: {e}")
             import traceback
             traceback.print_exc()
 
@@ -1943,7 +1966,6 @@ class CandleChartDialog(QtWidgets.QDialog):
             right_bars = right_chart._manager.get_all_bars()
 
             if not left_bars or not right_bars:
-                print("双图K线数据为空，无法绘制交易连线")
                 return
 
             # 为左侧图表绘制交易连线
@@ -1952,10 +1974,8 @@ class CandleChartDialog(QtWidgets.QDialog):
             # 为右侧图表绘制交易连线
             self._draw_trades_on_chart(right_chart, right_bars, "右侧")
 
-            print("✓ 双图交易连线绘制完成")
 
         except Exception as e:
-            print(f"绘制双图交易连线失败: {e}")
             import traceback
             traceback.print_exc()
 
@@ -1976,7 +1996,6 @@ class CandleChartDialog(QtWidgets.QDialog):
 
         candle_plot: pg.PlotItem = chart.get_plot("candle")
         if not candle_plot:
-            print(f"{chart_name}图表没有candle plot")
             return
 
         # 构建时间索引映射
@@ -2071,7 +2090,6 @@ class CandleChartDialog(QtWidgets.QDialog):
             scatter_item: pg.ScatterPlotItem = pg.ScatterPlotItem([open_scatter, close_scatter])
             candle_plot.addItem(scatter_item)
 
-        print(f"✓ {chart_name}图表绘制了 {len(trade_pairs)} 对交易连线")
 
     def _find_bar_index_for_trade(self, trade_dt, bars, dt_ix_map, ix_bar_map):
         """
@@ -2119,17 +2137,14 @@ class CandleChartDialog(QtWidgets.QDialog):
             bars: 新周期的K线数据列表
             interval: 新的周期字符串（如"1m", "5m", "15m", "1h", "d"）
         """
-        print(f"\n[CandleChartDialog] 收到周期切换通知: {interval}")
 
         # 第一步：清除现有的交易图形项
-        print("  清除旧的交易连线...")
         candle_plot: pg.PlotItem = self.chart.get_plot("candle")
         for item in self.items:
             candle_plot.removeItem(item)
         self.items.clear()
 
         # 第二步：清空并重建时间索引映射
-        print("  重建时间索引映射...")
         self.dt_ix_map.clear()
         self.ix_bar_map.clear()
 
@@ -2152,17 +2167,13 @@ class CandleChartDialog(QtWidgets.QDialog):
 
         self.price_range = self.high_price - self.low_price
 
-        print(f"  索引映射重建完成，共 {len(bars)} 根K线")
 
         # 第三步：重绘交易连线
         if self.trade_data:
-            print(f"  重绘 {len(self.trade_data)} 笔交易连线...")
             self.update_trades(self.trade_data)
-            print("  ✓ 交易连线重绘完成")
         else:
             print("  无交易数据需要重绘")
 
-        print(f"[CandleChartDialog] 周期切换处理完成\n")
 
     def clear_data(self) -> None:
         """"""
@@ -2227,10 +2238,40 @@ def generate_trade_pairs(trades: list) -> list:
 
     return trade_pairs
 
-# 使用新的界面设计替换原有的BacktesterManager
+# ===================================
+# 回测管理器 - 选择使用的UI版本
+# ===================================
+
+# 🎉 问题已解决！通过渐进式测试发现 emoji 字符导致 macOS bus error
+# 已从 RedesignedBacktesterManager 移除所有 emoji，现在使用现代化界面
+
 class BacktesterManager(RedesignedBacktesterManager):
     """
-    使用重新设计的回测管理器界面
-    这个类继承自RedesignedBacktesterManager，保持与原有接口的兼容性
+    使用重新设计的现代化回测管理器界面
+
+    已修复的问题：
+    - ✓ 延迟初始化引擎，避免 Qt + multiprocessing 冲突
+    - ✓ 移除 emoji 字符，避免 macOS 渲染崩溃
     """
     pass
+
+# 渐进式测试指南（已完成诊断，保留供参考）
+#
+# 通过测试 TestVersion1-6，确认了问题根源：
+# - TestVersion1-5：正常 ✓
+# - TestVersion6（添加emoji）：闪退 ✗
+#
+# 结论：emoji 字符在 macOS 上触发 bus error
+# 解决方案：移除所有 emoji，使用纯文本
+#
+# 如需重新测试，取消注释以下任一版本：
+# class BacktesterManager(TestVersion1):  # 最小化框架
+# class BacktesterManager(TestVersion2):  # + 表单控件
+# class BacktesterManager(TestVersion3):  # + 选项卡
+# class BacktesterManager(TestVersion4):  # + 图表布局
+# class BacktesterManager(TestVersion5):  # + 深色样式
+# class BacktesterManager(TestVersion6):  # + emoji（会闪退）
+#
+# 或使用原始UI：
+# class BacktesterManager(OriginalBacktesterManager):
+#     pass

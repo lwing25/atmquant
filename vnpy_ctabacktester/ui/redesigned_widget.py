@@ -63,12 +63,16 @@ class RedesignedBacktesterManager(QtWidgets.QWidget):
 
         self.target_display: str = ""
 
+        # 延迟初始化标志，避免 Qt + multiprocessing 冲突（macOS bus error）
+        self._engine_initialized: bool = False
+
         self.init_ui()
         self.register_event()
-        self.backtester_engine.init_engine()
-        self.init_strategy_settings()
+        # 注释掉：延迟到真正需要时才初始化引擎（避免 Qt + multiprocessing 冲突）
+        # self.backtester_engine.init_engine()
+        # self.init_strategy_settings()
         self.load_backtesting_setting()
-        
+
         # 初始化对话框（延迟导入避免循环依赖）
         self.trade_dialog = None
         self.order_dialog = None
@@ -84,6 +88,25 @@ class RedesignedBacktesterManager(QtWidgets.QWidget):
             self.settings[class_name] = setting
 
         self.class_combo.addItems(self.class_names)
+
+    def ensure_engine_initialized(self) -> None:
+        """
+        确保引擎已初始化（延迟初始化模式）
+
+        这个方法解决了 macOS 上的 Qt + multiprocessing 冲突问题：
+        - 在 __init__() 中过早初始化引擎会触发多进程池创建
+        - macOS 的 spawn 模式会尝试序列化 Qt 对象到子进程
+        - Qt 对象不可序列化，导致 bus error 和信号量泄漏
+
+        延迟初始化策略：
+        - 构造函数中不初始化引擎
+        - 在真正需要时（用户点击操作按钮）才初始化
+        - 使用标志位确保只初始化一次
+        """
+        if not self._engine_initialized:
+            self.backtester_engine.init_engine()
+            self.init_strategy_settings()
+            self._engine_initialized = True
 
     def init_ui(self) -> None:
         """"""
@@ -831,6 +854,9 @@ class RedesignedBacktesterManager(QtWidgets.QWidget):
 
     def start_backtesting(self) -> None:
         """开始回测"""
+        # 确保引擎已初始化（延迟初始化）
+        self.ensure_engine_initialized()
+
         class_name: str = self.class_combo.currentText()
         if not class_name:
             self.write_log(_("请选择要回测的策略"))
@@ -922,6 +948,9 @@ class RedesignedBacktesterManager(QtWidgets.QWidget):
 
     def start_optimization(self) -> None:
         """开始参数优化"""
+        # 确保引擎已初始化（延迟初始化）
+        self.ensure_engine_initialized()
+
         class_name: str = self.class_combo.currentText()
         vt_symbol: str = self.symbol_line.text()
         interval: str = self.interval_combo.currentText()
@@ -1008,6 +1037,9 @@ class RedesignedBacktesterManager(QtWidgets.QWidget):
 
     def reload_strategy_class(self) -> None:
         """重载策略类"""
+        # 确保引擎已初始化（延迟初始化）
+        self.ensure_engine_initialized()
+
         self.backtester_engine.reload_strategy_class()
 
         current_strategy_name: str = self.class_combo.currentText()
@@ -1886,6 +1918,7 @@ class MetricsGridWidget(QtWidgets.QWidget):
             
         except ImportError:
             # 如果没有matplotlib，返回文本数据
+            print("matplotlib未安装，无法生成月度图表，返回文本数据。")
             text_data = {}
             for month, stats in sorted(monthly_stats.items()):
                 if isinstance(stats, dict):
@@ -2116,6 +2149,7 @@ class MetricsGridWidget(QtWidgets.QWidget):
             
         except ImportError:
             # 如果没有matplotlib，返回文本数据
+            print("matplotlib未安装，无法生成区间图表，返回文本数据。")
             text_data = {}
             for interval, stats in interval_stats.items():
                 if isinstance(stats, dict):
@@ -2221,8 +2255,8 @@ class ChartWidget(QtWidgets.QWidget):
         chart_layout = QtWidgets.QVBoxLayout()
         chart_layout.setContentsMargins(0, 0, 0, 0)
         
-        # 创建占位符
-        self.placeholder_label = QtWidgets.QLabel(f"📈 {self.title}图表")
+        # 创建占位符（移除 emoji 避免 macOS bus error）
+        self.placeholder_label = QtWidgets.QLabel(f"{self.title}图表")
         self.placeholder_label.setAlignment(QtCore.Qt.AlignCenter)
         self.placeholder_label.setStyleSheet("""
             QLabel {
@@ -2244,18 +2278,10 @@ class ChartWidget(QtWidgets.QWidget):
     def on_chart_changed(self, text: str):
         """图表类型改变"""
         self.title_label.setText(text)
-        
-        # 更新占位符
-        emoji_map = {
-            "账户净值": "📈",
-            "净值回撤": "📉", 
-            "每日盈亏": "📊",
-            "滚动夏普比率": "📈"
-        }
-        
-        emoji = emoji_map.get(text, "📊")
-        self.placeholder_label.setText(f"{emoji} {text}图表")
-        
+
+        # 更新占位符（移除 emoji 避免 macOS bus error）
+        self.placeholder_label.setText(f"{text}图表")
+
         # 如果有数据，重新绘制图表
         if hasattr(self, 'current_data') and self.current_data is not None:
             self.update_chart_data(self.current_data)
