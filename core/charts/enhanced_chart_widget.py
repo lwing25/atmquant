@@ -20,12 +20,23 @@ from vnpy.trader.database import get_database
 from vnpy.trader.constant import Exchange, Interval
 from vnpy.trader.object import BarData
 
-from vnpy.chart import ChartWidget, VolumeItem, CandleItem
+from vnpy.chart import ChartWidget, CandleItem
 from vnpy.chart.item import ChartItem
 from vnpy.chart.manager import BarManager
 from vnpy.chart.base import NORMAL_FONT
 from vnpy.chart.axis import DatetimeAxis
 from vnpy.chart.widget import ChartCursor
+
+# 优先导入增强版volume指标，如果没有则使用默认版本
+try:
+    from .enhanced_volume_item import EnhancedVolumeItem
+
+    VolumeItem = EnhancedVolumeItem
+    VOLUME_CONFIGURABLE = True
+except ImportError:
+    from vnpy.chart import VolumeItem
+
+    VOLUME_CONFIGURABLE = False
 
 from .boll_item import BollItem
 from .multi_sma_item import MultiSmaItem
@@ -40,6 +51,7 @@ class ExtendableViewBox(pg.ViewBox):
     """
     增强版ViewBox，支持在最右边拖拽延伸x轴，在顶部/底部拖拽延伸y轴
     """
+
     def __init__(self, chart_widget, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.chart_widget = chart_widget
@@ -53,8 +65,8 @@ class ExtendableViewBox(pg.ViewBox):
         """重写鼠标按下事件"""
         # 在Mac上，支持Command键和Control键
         is_ctrl_pressed = (
-            ev.modifiers() == QtCore.Qt.ControlModifier or
-            ev.modifiers() == QtCore.Qt.MetaModifier  # Mac上的Command键
+            ev.modifiers() == QtCore.Qt.ControlModifier
+            or ev.modifiers() == QtCore.Qt.MetaModifier  # Mac上的Command键
         )
 
         if ev.button() == QtCore.Qt.LeftButton:
@@ -250,7 +262,7 @@ class EnhancedChartWidget(ChartWidget):
     增强版K线图表组件
     继承自vnpy的ChartWidget，提供丰富的技术指标和交互功能
     """
-    
+
     def __init__(self, parent: QtWidgets.QWidget = None):
         # 首先初始化配置，这些在父类初始化之前设置
         self.main_indicators = {
@@ -258,23 +270,27 @@ class EnhancedChartWidget(ChartWidget):
             "sma": [MultiSmaItem, "sma", False, True],
             "ema": [MultiEmaItem, "ema", False, True],
         }
-        
+
         self.sub_indicators = {
-            "volume": [VolumeItem, "volume", True, 120, 200, False],
+            "volume": [VolumeItem, "volume", True, 120, 200, VOLUME_CONFIGURABLE],
             "macd": [Macd3Item, "macd", True, 120, 180, True],
             "rsi": [RsiItem, "rsi", False, 100, 150, True],
             "dmi": [DmiItem, "dmi", True, 100, 150, True],
         }
-        
+
         # 记录指标可见状态
-        self.main_indicator_visibility = {name: config[2] for name, config in self.main_indicators.items()}
-        self.sub_indicator_visibility = {name: config[2] for name, config in self.sub_indicators.items()}
-        
+        self.main_indicator_visibility = {
+            name: config[2] for name, config in self.main_indicators.items()
+        }
+        self.sub_indicator_visibility = {
+            name: config[2] for name, config in self.sub_indicators.items()
+        }
+
         # 保存绘图区域的原始高度，用于双击恢复
         self.original_heights = {}
         # 记录哪些绘图区域处于放大状态
         self.enlarged_plots = set()
-        
+
         # 多周期相关属性
         self.current_interval = Interval.MINUTE  # 默认1分钟
         self._actual_interval = "1m"  # 实际周期字符串
@@ -290,44 +306,52 @@ class EnhancedChartWidget(ChartWidget):
         self.on_interval_changed_callback = None
 
         # 双击专注模式相关状态
-        self.focus_mode = None  # None: 正常模式, "main": 只显示主图, "plot_name": 只显示某个副图
+        self.focus_mode = (
+            None  # None: 正常模式, "main": 只显示主图, "plot_name": 只显示某个副图
+        )
         self.saved_plot_visibility = {}  # 保存进入focus模式前的副图可见性状态
 
         # 调用父类初始化
         super().__init__(parent)
-        
+
         # 设置窗口标题
         self.setWindowTitle("增强版K线图表")
-        
+
         # 初始化图表（父类初始化完成后）
         self._init_charts()
-        
+
         # 创建控制界面
         self._create_controls()
-        
+
         # 创建周期切换面板
         self._create_interval_panel()
-        
+
         # 设置附图双击事件
         self._setup_double_click_handlers()
-    
+
     def _setup_high_quality_rendering(self):
         """设置高质量渲染"""
         try:
             # 启用抗锯齿
             pg.setConfigOptions(antialias=True)
             pg.setConfigOptions(useOpenGL=True)
-            pg.setConfigOptions(background='k')  # 黑色背景
-            
+            pg.setConfigOptions(background="k")  # 黑色背景
+
             # 设置图表的渲染质量
-            for plot_item in self._plots.values() if hasattr(self, '_plots') else []:
-                if hasattr(plot_item, 'getViewBox'):
+            for plot_item in self._plots.values() if hasattr(self, "_plots") else []:
+                if hasattr(plot_item, "getViewBox"):
                     viewbox = plot_item.getViewBox()
                     if viewbox:
                         # 启用抗锯齿
-                        viewbox.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing, True)
-                        viewbox.setRenderHint(QtGui.QPainter.RenderHint.TextAntialiasing, True)
-                        viewbox.setRenderHint(QtGui.QPainter.RenderHint.SmoothPixmapTransform, True)
+                        viewbox.setRenderHint(
+                            QtGui.QPainter.RenderHint.Antialiasing, True
+                        )
+                        viewbox.setRenderHint(
+                            QtGui.QPainter.RenderHint.TextAntialiasing, True
+                        )
+                        viewbox.setRenderHint(
+                            QtGui.QPainter.RenderHint.SmoothPixmapTransform, True
+                        )
 
         except Exception:
             pass  # 静默失败
@@ -336,125 +360,132 @@ class EnhancedChartWidget(ChartWidget):
         """将高质量渲染设置应用到所有绘图区域"""
         try:
             for plot_name, plot_item in self._plots.items():
-                if hasattr(plot_item, 'getViewBox'):
+                if hasattr(plot_item, "getViewBox"):
                     viewbox = plot_item.getViewBox()
                     if viewbox:
                         # 设置高质量变换
-                        if hasattr(viewbox, 'setAspectLocked'):
+                        if hasattr(viewbox, "setAspectLocked"):
                             viewbox.setAspectLocked(False)
 
                         # 对于ExtendableViewBox，尝试设置其他质量选项
-                        if hasattr(viewbox, 'setAntialiasing'):
+                        if hasattr(viewbox, "setAntialiasing"):
                             viewbox.setAntialiasing(True)
 
                         # 设置绘图项目的质量
-                        if hasattr(plot_item, 'setAntialiasing'):
+                        if hasattr(plot_item, "setAntialiasing"):
                             plot_item.setAntialiasing(True)
 
         except Exception:
             pass  # 静默失败
-    
+
     def _init_charts(self):
         """初始化图表结构"""
         # 创建主图
-        self.add_plot("candle", minimum_height=300, hide_x_axis=True)
+        self.add_plot("candle", minimum_height=250, hide_x_axis=True)
         self.add_item(CandleItem, "candle", "candle")
-        
+
         # 添加主图指标
         for name, config in self.main_indicators.items():
             item_class, item_key, default_visible, _ = config
             self.add_item(item_class, item_key, "candle")
-            
+
             # 如果默认不可见，则隐藏
             if not default_visible:
                 self._items[item_key].hide()
-        
+
         # 创建附图
-        for name, config in self.sub_indicators.items():
+        sub_names = list(self.sub_indicators.keys())
+        for idx, name in enumerate(sub_names):
+            config = self.sub_indicators[name]
             item_class, item_key, default_visible, min_height, max_height, _ = config
-            
+
             # 创建附图
-            self.add_plot(name, minimum_height=min_height, maximum_height=max_height, hide_x_axis=(name != "volume"))
+            self.add_plot(name, minimum_height=min_height, hide_x_axis=True)
             self.add_item(item_class, name, item_key)
-            
+
             # 保存原始高度
             self.original_heights[name] = {
                 "minimum_height": min_height,
-                "maximum_height": max_height
+                "maximum_height": max_height,
             }
-            
+
             # 如果默认不可见，则隐藏附图
             if not default_visible:
                 self._plots[name].hide()
-        
+
         # 添加光标
         self.add_cursor()
-    
-    def add_plot(self, plot_name: str, minimum_height: int = 80, maximum_height: int = None, hide_x_axis: bool = False) -> None:
+
+        # 确保最后一个可见的附图显示X轴
+        self._update_xaxis_visibility()
+
+    def add_plot(
+        self,
+        plot_name: str,
+        minimum_height: int = 80,
+        hide_x_axis: bool = False,
+    ) -> None:
         """
         重写父类的add_plot方法，使用自定义的ExtendableViewBox
         """
         # 创建自定义ViewBox
         viewbox = ExtendableViewBox(self)
-        
+
         # 创建plot对象，使用自定义ViewBox
         plot = pg.PlotItem(
-            axisItems={'bottom': self._get_new_x_axis()},
+            axisItems={"bottom": self._get_new_x_axis()},
             viewBox=viewbox,
-            name=plot_name
+            name=plot_name,
         )
         plot.setMenuEnabled(False)
         plot.setClipToView(True)
-        plot.hideAxis('left')
-        plot.showAxis('right')
-        plot.setDownsampling(mode='peak')
+        plot.hideAxis("left")
+        plot.showAxis("right")
+        plot.setDownsampling(mode="peak")
         plot.setRange(xRange=(0, 1), yRange=(0, 1))
         plot.hideButtons()
         plot.setMinimumHeight(minimum_height)
-        
-        if maximum_height:
-            plot.setMaximumHeight(maximum_height)
-        
+
         if hide_x_axis:
             plot.hideAxis("bottom")
-        
+
         if not self._first_plot:
             self._first_plot = plot
-        
+
         # 连接view change信号到更新y范围函数
         view = plot.getViewBox()
         view.sigXRangeChanged.connect(self._update_y_range)
         view.setMouseEnabled(x=True, y=True)
-        
+
         # 设置右轴
-        right_axis = plot.getAxis('right')
+        right_axis = plot.getAxis("right")
         right_axis.setWidth(60)
         right_axis.tickFont = NORMAL_FONT
-        
+
         # 连接x轴链接
         if self._plots:
             first_plot = list(self._plots.values())[0]
             plot.setXLink(first_plot)
-        
+
         # 保存plot对象
         self._plots[plot_name] = plot
-        
+
         # 添加plot到布局
         self._layout.nextRow()
         self._layout.addItem(plot)
-    
+
     def _create_controls(self):
         """创建控制界面"""
         # 创建主图指标控制面板
         self._create_main_indicator_controls()
-        
+
         # 创建附图指标控制面板
         self._create_sub_indicator_controls()
-    
+
     def _create_main_indicator_controls(self):
         """创建主图指标控制面板"""
         control_widget = QtWidgets.QWidget(self)
-        
+
         # 设置50%透明度的背景样式
         control_widget.setStyleSheet("""
             QWidget {
@@ -462,15 +493,15 @@ class EnhancedChartWidget(ChartWidget):
                 border-radius: 5px;
             }
         """)
-        
+
         control_layout = QtWidgets.QHBoxLayout(control_widget)
         control_layout.setContentsMargins(10, 0, 10, 0)
         control_layout.setSpacing(5)  # 减少控件间距
-        
+
         # 创建标签
         label = QtWidgets.QLabel("主图指标：")
         control_layout.addWidget(label)
-        
+
         # 创建复选框
         self.main_checkboxes = {}
         for name, config in self.main_indicators.items():
@@ -478,32 +509,40 @@ class EnhancedChartWidget(ChartWidget):
             indicator_container = QtWidgets.QHBoxLayout()
             indicator_container.setContentsMargins(0, 0, 0, 0)
             indicator_container.setSpacing(0)  # 复选框、标签和按钮之间无间距
-            indicator_container.setSizeConstraint(QtWidgets.QLayout.SetFixedSize)  # 容器不拉伸
-            
+            indicator_container.setSizeConstraint(
+                QtWidgets.QLayout.SetFixedSize
+            )  # 容器不拉伸
+
             # 创建复选框和标签的组合
             checkbox = QtWidgets.QCheckBox()
             checkbox.setChecked(config[2])  # 默认可见状态
-            checkbox.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
+            checkbox.setSizePolicy(
+                QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed
+            )
             checkbox.setFixedSize(16, 16)  # 固定复选框大小
-            
+
             # 创建标签显示文本
             label = QtWidgets.QLabel(name)
-            label.setSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Preferred)
+            label.setSizePolicy(
+                QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Preferred
+            )
             label.setStyleSheet("QLabel { margin: 0; padding: 0; text-align: left; }")
             label.setAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
             label.setMinimumWidth(0)
             label.adjustSize()
-            
+
             # 将复选框和标签添加到容器
             indicator_container.addWidget(checkbox)
             indicator_container.addWidget(label)
             # 使用partial避免闭包问题
             checkbox.stateChanged.connect(partial(self._toggle_main_indicator, name))
             self.main_checkboxes[name] = checkbox
-            
+
             # 如果指标可配置，添加配置按钮
             if len(config) > 3 and config[3]:  # 可配置
-                config_btn = QtWidgets.QPushButton("...")  # 配置按钮（纯ASCII，避免emoji崩溃）
+                config_btn = QtWidgets.QPushButton(
+                    "[x]"
+                )  # 配置按钮（纯ASCII，避免emoji崩溃）
                 config_btn.setFixedSize(20, 20)
                 config_btn.setStyleSheet("""
                     QPushButton {
@@ -517,22 +556,24 @@ class EnhancedChartWidget(ChartWidget):
                     }
                 """)
                 config_btn.setToolTip(f"配置{name}")
-                config_btn.clicked.connect(partial(self._configure_indicator, name, True))
+                config_btn.clicked.connect(
+                    partial(self._configure_indicator, name, True)
+                )
                 indicator_container.addWidget(config_btn)
-            
+
             # 将容器添加到主布局
             control_layout.addLayout(indicator_container)
-        
+
         # 自适应宽度设置
         control_widget.adjustSize()
         control_widget.setFixedHeight(30)
         control_widget.move(10, 5)
         self.main_controls_widget = control_widget
-    
+
     def _create_sub_indicator_controls(self):
         """创建附图指标控制面板"""
         control_widget = QtWidgets.QWidget(self)
-        
+
         # 设置50%透明度的背景样式
         control_widget.setStyleSheet("""
             QWidget {
@@ -540,15 +581,15 @@ class EnhancedChartWidget(ChartWidget):
                 border-radius: 5px;
             }
         """)
-        
+
         control_layout = QtWidgets.QHBoxLayout(control_widget)
         control_layout.setContentsMargins(10, 0, 10, 0)
         control_layout.setSpacing(5)  # 减少控件间距
-        
+
         # 创建标签
         label = QtWidgets.QLabel("附图指标：")
         control_layout.addWidget(label)
-        
+
         # 创建复选框
         self.sub_checkboxes = {}
         for name, config in self.sub_indicators.items():
@@ -556,32 +597,40 @@ class EnhancedChartWidget(ChartWidget):
             indicator_container = QtWidgets.QHBoxLayout()
             indicator_container.setContentsMargins(0, 0, 0, 0)
             indicator_container.setSpacing(0)  # 复选框、标签和按钮之间无间距
-            indicator_container.setSizeConstraint(QtWidgets.QLayout.SetFixedSize)  # 容器不拉伸
-            
+            indicator_container.setSizeConstraint(
+                QtWidgets.QLayout.SetFixedSize
+            )  # 容器不拉伸
+
             # 创建复选框和标签的组合
             checkbox = QtWidgets.QCheckBox()
             checkbox.setChecked(config[2])  # 默认可见状态
-            checkbox.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
+            checkbox.setSizePolicy(
+                QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed
+            )
             checkbox.setFixedSize(16, 16)  # 固定复选框大小
-            
+
             # 创建标签显示文本
             label = QtWidgets.QLabel(name)
-            label.setSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Preferred)
+            label.setSizePolicy(
+                QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Preferred
+            )
             label.setStyleSheet("QLabel { margin: 0; padding: 0; text-align: left; }")
             label.setAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
             label.setMinimumWidth(0)
             label.adjustSize()
-            
+
             # 将复选框和标签添加到容器
             indicator_container.addWidget(checkbox)
             indicator_container.addWidget(label)
             # 使用partial避免闭包问题
             checkbox.stateChanged.connect(partial(self._toggle_sub_indicator, name))
             self.sub_checkboxes[name] = checkbox
-            
+
             # 如果指标可配置，添加配置按钮
             if len(config) > 5 and config[5]:  # 可配置
-                config_btn = QtWidgets.QPushButton("...")  # 配置按钮（纯ASCII，避免emoji崩溃）
+                config_btn = QtWidgets.QPushButton(
+                    "[x]"
+                )  # 配置按钮（纯ASCII，避免emoji崩溃）
                 config_btn.setFixedSize(20, 20)
                 config_btn.setStyleSheet("""
                     QPushButton {
@@ -595,36 +644,38 @@ class EnhancedChartWidget(ChartWidget):
                     }
                 """)
                 config_btn.setToolTip(f"配置{name}")
-                config_btn.clicked.connect(partial(self._configure_indicator, name, False))
+                config_btn.clicked.connect(
+                    partial(self._configure_indicator, name, False)
+                )
                 indicator_container.addWidget(config_btn)
-            
+
             # 将容器添加到主布局
             control_layout.addLayout(indicator_container)
-        
+
         # 自适应宽度设置
         control_widget.adjustSize()
         control_widget.setFixedHeight(30)
         control_widget.move(10, self.height() - 60)
         self.sub_controls_widget = control_widget
-        
+
         # 重写resize事件以更新控件位置
         original_resize_event = self.resizeEvent
-        
+
         def resize_event_handler(event):
             if original_resize_event:
                 original_resize_event(event)
-            
+
             # 更新附图控制面板位置
-            if hasattr(self, 'sub_controls_widget'):
+            if hasattr(self, "sub_controls_widget"):
                 self.sub_controls_widget.move(10, self.height() - 60)
-        
+
         self.resizeEvent = resize_event_handler
-    
+
     def _toggle_main_indicator(self, name: str, state: int):
         """切换主图指标的可见性"""
         if name not in self.main_indicators:
             return
-        
+
         item_class, item_key, default_visible, configurable = self.main_indicators[name]
         is_checked = state == QtCore.Qt.Checked.value
 
@@ -658,58 +709,56 @@ class EnhancedChartWidget(ChartWidget):
                 plot = self._plots["candle"]
                 item = self._items[item_key]
                 plot.removeItem(item)
-        
+
         self.main_indicator_visibility[name] = is_checked
         # 强制重绘整个图表
         self.update()
         # 刷新视图
-        if hasattr(self, '_plots') and "candle" in self._plots:
+        if hasattr(self, "_plots") and "candle" in self._plots:
             self._plots["candle"].update()
-    
+
     def _toggle_sub_indicator(self, name: str, state: int):
         """切换附图指标的可见性"""
         if name not in self.sub_indicators:
             return
-        
-        item_class, item_key, default_visible, min_height, max_height, configurable = self.sub_indicators[name]
+
+        item_class, item_key, default_visible, min_height, max_height, configurable = (
+            self.sub_indicators[name]
+        )
         is_checked = state == QtCore.Qt.Checked.value
-        
+
         if is_checked:
             # 如果要显示但绘图区域不存在，重新创建
             if name not in self._plots:
-                self.add_plot(name, minimum_height=min_height, maximum_height=max_height)
+                self.add_plot(name, minimum_height=min_height)
                 self.add_item(item_class, name, item_key)
-                # 立即更新数据
                 history = self._manager.get_all_bars()
                 if history and item_key in self._items:
                     self._items[item_key].update_history(history)
                     self._items[item_key].update()
             else:
-                # 如果存在，确保可见
                 plot = self._plots[name]
                 plot.show()
                 if item_key in self._items:
                     item = self._items[item_key]
                     item.setVisible(True)
-                    # 重新计算数据
                     history = self._manager.get_all_bars()
                     if history:
                         item.update_history(history)
                         item.update()
         else:
-            # 隐藏绘图区域
             if name in self._plots:
                 plot = self._plots[name]
                 plot.hide()
                 if item_key in self._items:
                     item = self._items[item_key]
                     item.setVisible(False)
-        
+
         self.sub_indicator_visibility[name] = is_checked
         self._layout.updateGeometry()
-        # 强制重绘
         self.update()
-    
+        self._update_xaxis_visibility()
+
     def _configure_indicator(self, name: str, is_main_indicator: bool):
         """配置指标参数"""
         if is_main_indicator:
@@ -720,35 +769,35 @@ class EnhancedChartWidget(ChartWidget):
             if name not in self.sub_indicators:
                 return
             item_key = self.sub_indicators[name][1]
-        
+
         if item_key not in self._items:
             return
-        
+
         item = self._items[item_key]
         if not isinstance(item, ConfigurableIndicator):
             QtWidgets.QMessageBox.information(self, "提示", f"{name} 指标不支持配置")
             return
-        
+
         # 获取配置对话框
         dialog = item.get_config_dialog(self)
-        
+
         # 保存原始的应用配置方法
         original_apply_config = item.apply_config
-        
+
         # 包装应用配置方法，添加图表更新逻辑
         def wrapped_apply_config(config):
             # 调用原始配置方法
             original_apply_config(config)
-            
+
             # 强制更新数据和重绘
             history = self._manager.get_all_bars()
             if history:
                 item.update_history(history)
                 item.update()
-            
+
             # 刷新图表
             self.update()
-            
+
             # 如果是主图指标，也刷新主图
             if is_main_indicator and "candle" in self._plots:
                 self._plots["candle"].update()
@@ -758,25 +807,25 @@ class EnhancedChartWidget(ChartWidget):
                     if plot_name != "candle" and item_key in self._items:
                         plot.update()
                         break
-        
+
         # 临时替换应用配置方法
         item.apply_config = wrapped_apply_config
-        
+
         try:
             result = dialog.exec_()
         finally:
             # 恢复原始方法
             item.apply_config = original_apply_config
-        
+
         return result
-    
+
     def _setup_double_click_handlers(self):
         """设置主图和附图的双击事件处理"""
         # 为主图（candle）设置双击事件
         candle_plot = self._plots.get("candle")
         if candle_plot:
             # 保存原始的双击事件处理函数
-            original_double_click = getattr(candle_plot, 'mouseDoubleClickEvent', None)
+            original_double_click = getattr(candle_plot, "mouseDoubleClickEvent", None)
 
             def main_double_click_handler(event):
                 # 先调用原始处理函数（如果有）
@@ -791,7 +840,7 @@ class EnhancedChartWidget(ChartWidget):
         for plot_name, plot in self._plots.items():
             if plot_name != "candle":  # 跳过主图
                 # 为plot设置双击事件处理
-                original_double_click = getattr(plot, 'mouseDoubleClickEvent', None)
+                original_double_click = getattr(plot, "mouseDoubleClickEvent", None)
 
                 def create_double_click_handler(name, original_handler):
                     def double_click_handler(event):
@@ -799,9 +848,12 @@ class EnhancedChartWidget(ChartWidget):
                             original_handler(event)
                         # 切换该副图的专注模式
                         self._toggle_sub_focus(name)
+
                     return double_click_handler
 
-                plot.mouseDoubleClickEvent = create_double_click_handler(plot_name, original_double_click)
+                plot.mouseDoubleClickEvent = create_double_click_handler(
+                    plot_name, original_double_click
+                )
 
     def _toggle_main_focus(self):
         """切换主图专注模式（隐藏/显示所有副图）"""
@@ -843,6 +895,7 @@ class EnhancedChartWidget(ChartWidget):
                 else:
                     self._plots[plot_name].hide()
         self._layout.updateGeometry()
+        self._update_xaxis_visibility()
 
     def _hide_all_sub_plots(self):
         """隐藏所有副图"""
@@ -850,6 +903,7 @@ class EnhancedChartWidget(ChartWidget):
             if plot_name != "candle":
                 plot.hide()
         self._layout.updateGeometry()
+        self._update_xaxis_visibility()
 
     def _hide_all_sub_plots_except(self, except_plot_name: str):
         """隐藏除了指定副图之外的所有副图"""
@@ -860,61 +914,87 @@ class EnhancedChartWidget(ChartWidget):
                 else:
                     plot.hide()
         self._layout.updateGeometry()
+        self._update_xaxis_visibility()
+
+    def _update_xaxis_visibility(self):
+        """确保最后一个可见的附图显示X轴"""
+        # 先隐藏所有附图的X轴
+        for name, plot in self._plots.items():
+            if name != "candle":
+                plot.hideAxis("bottom")
+
+        # 找到最后一个可见的附图
+        visible_plots = [
+            name
+            for name in self.sub_indicators.keys()
+            if name in self._plots and self._plots[name].isVisible()
+        ]
+
+        if visible_plots:
+            last_visible = visible_plots[-1]
+            last_plot = self._plots.get(last_visible)
+            if last_plot:
+                last_plot.showAxis("bottom")
 
     def update_history(self, history: List[BarData]) -> None:
         """更新历史数据"""
         # 保存原始1分钟K线数据
         if history and history[0].interval == Interval.MINUTE:
             self.base_minute_bars = history.copy()
-        
+
         # 如果当前不是1分钟周期，需要重新聚合数据
         if self.current_interval != Interval.MINUTE and self.base_minute_bars:
-            aggregated_bars = self._aggregate_bars(self.base_minute_bars, self.current_interval)
+            aggregated_bars = self._aggregate_bars(
+                self.base_minute_bars, self.current_interval
+            )
             super().update_history(aggregated_bars)
         else:
             super().update_history(history)
-        
+
         # 移动到最右侧显示最新数据
         self.move_to_right()
-    
+
     def update_bar(self, bar: BarData) -> None:
         """更新单个K线数据"""
         super().update_bar(bar)
-    
+
     def clear_all(self) -> None:
         """清空所有数据"""
         for item in self._items.values():
-            if hasattr(item, 'clear_all'):
+            if hasattr(item, "clear_all"):
                 item.clear_all()
-        
+
         self.update()
-    
+
     def _get_hour_session_index(self, bar_time: time) -> Optional[int]:
         """
         根据交易时段判断当前时间属于哪个小时时段
-        
+
         注意：时段范围是闭区间，start和end分别表示该时段的第一分钟和最后一分钟
         例如：(time(9,0), time(9,59)) 表示 09:00-09:59 这一小时的所有分钟
-        
+
         Args:
             bar_time: K线时间（1分钟K线的时间戳）
-        
+
         Returns:
             时段索引，如果不在任何时段内则返回None（将按自然小时聚合）
         """
         if not self.trading_session or not self.trading_session.hour_sessions:
             # 如果没有定义交易时段，返回None（使用自然小时）
             return None
-        
+
         # 先检查日盘时段
         for idx, (start, end) in enumerate(self.trading_session.hour_sessions):
             # 时段范围是闭区间 [start, end]
             # start和end都表示分钟级别的时间点
             if start <= bar_time <= end:
                 return idx
-        
+
         # 如果有夜盘，检查夜盘时段
-        if self.trading_session.has_night_session and self.trading_session.night_sessions:
+        if (
+            self.trading_session.has_night_session
+            and self.trading_session.night_sessions
+        ):
             offset = len(self.trading_session.hour_sessions)
             for idx, (start, end) in enumerate(self.trading_session.night_sessions):
                 # 夜盘可能跨越午夜（例如 23:00 到次日 02:30）
@@ -926,42 +1006,48 @@ class EnhancedChartWidget(ChartWidget):
                     # 跨午夜的情况（例如 23:00 > 02:30，表示23:00-23:59和00:00-02:30）
                     if bar_time >= start or bar_time <= end:
                         return offset + idx
-        
+
         # 不在任何定义的时段内，返回None（按自然小时处理）
         return None
-    
-    def _aggregate_bars(self, minute_bars: List[BarData], target_interval: Interval) -> List[BarData]:
+
+    def _aggregate_bars(
+        self, minute_bars: List[BarData], target_interval: Interval
+    ) -> List[BarData]:
         """
         将1分钟K线聚合为目标周期的K线
-        
+
         Args:
             minute_bars: 1分钟K线数据列表
             target_interval: 目标周期（5m, 15m, 1h, d）
-        
+
         Returns:
             聚合后的K线数据列表
         """
         if not minute_bars:
             return []
-        
+
         # 确定聚合周期的分钟数
         interval_minutes = {
             "1m": 1,
             "5m": 5,
             "15m": 15,
             "1h": 60,
-            "d": 1440  # 一天
+            "d": 1440,  # 一天
         }
-        
-        interval_str = target_interval.value if isinstance(target_interval, Interval) else target_interval
+
+        interval_str = (
+            target_interval.value
+            if isinstance(target_interval, Interval)
+            else target_interval
+        )
         minutes = interval_minutes.get(interval_str, 1)
-        
+
         if minutes == 1:
             return minute_bars
-        
+
         aggregated = []
         current_bar = None
-        
+
         for bar in minute_bars:
             # 确定当前bar应该属于哪个聚合周期
             if interval_str == "d":
@@ -971,7 +1057,7 @@ class EnhancedChartWidget(ChartWidget):
                 # 小时线：按照交易时段或自然小时聚合
                 bar_time = bar.datetime.time()
                 session_index = self._get_hour_session_index(bar_time)
-                
+
                 if session_index is not None:
                     # 使用交易时段索引作为key
                     bar_key = (bar.datetime.date(), f"session_{session_index}")
@@ -983,7 +1069,7 @@ class EnhancedChartWidget(ChartWidget):
                 total_minutes = bar.datetime.hour * 60 + bar.datetime.minute
                 period_index = total_minutes // minutes
                 bar_key = (bar.datetime.date(), period_index)
-            
+
             if current_bar is None:
                 # 开始新的聚合周期
                 current_bar = BarData(
@@ -998,7 +1084,7 @@ class EnhancedChartWidget(ChartWidget):
                     volume=bar.volume,
                     turnover=bar.turnover,
                     open_interest=bar.open_interest,
-                    gateway_name=bar.gateway_name
+                    gateway_name=bar.gateway_name,
                 )
                 current_bar_key = bar_key
             else:
@@ -1006,7 +1092,7 @@ class EnhancedChartWidget(ChartWidget):
                 if bar_key != current_bar_key:
                     # 保存当前聚合的bar
                     aggregated.append(current_bar)
-                    
+
                     # 开始新的聚合周期
                     current_bar = BarData(
                         symbol=bar.symbol,
@@ -1020,7 +1106,7 @@ class EnhancedChartWidget(ChartWidget):
                         volume=bar.volume,
                         turnover=bar.turnover,
                         open_interest=bar.open_interest,
-                        gateway_name=bar.gateway_name
+                        gateway_name=bar.gateway_name,
                     )
                     current_bar_key = bar_key
                 else:
@@ -1031,41 +1117,41 @@ class EnhancedChartWidget(ChartWidget):
                     current_bar.volume += bar.volume
                     current_bar.turnover += bar.turnover
                     current_bar.open_interest = bar.open_interest  # 使用最新的持仓量
-        
+
         # 添加最后一个聚合的bar
         if current_bar is not None:
             aggregated.append(current_bar)
-        
+
         return aggregated
-    
+
     def set_trading_session(self, trading_session):
         """
         设置交易时段
-        
+
         Args:
             trading_session: TradingSession对象或MarketType枚举
         """
         from config.trading_sessions_config import MarketType, get_trading_session
-        
+
         if isinstance(trading_session, MarketType):
             self.trading_session = get_trading_session(trading_session)
         else:
             self.trading_session = trading_session
-    
+
     def set_trading_session_by_symbol(self, symbol: str, exchange: str = ""):
         """
         根据品种代码自动设置交易时段
-        
+
         Args:
             symbol: 品种代码
             exchange: 交易所代码
         """
         from config.trading_sessions_config import get_trading_session_by_symbol
-        
+
         self.trading_session = get_trading_session_by_symbol(symbol, exchange)
         self.current_symbol = symbol
         self.current_exchange = exchange
-    
+
     def _create_interval_panel(self):
         """创建时间周期切换面板"""
         # 创建无背景的容器
@@ -1075,11 +1161,11 @@ class EnhancedChartWidget(ChartWidget):
                 background-color: transparent;
             }
         """)
-        
+
         panel_layout = QtWidgets.QVBoxLayout(panel_widget)
         panel_layout.setContentsMargins(0, 0, 0, 0)  # 无外边距
         panel_layout.setSpacing(0)  # 按钮之间无空隙
-        
+
         # 定义周期选项 - 文字竖排显示
         intervals = [
             ("1m", "1\n分\n钟", Interval.MINUTE),
@@ -1088,7 +1174,7 @@ class EnhancedChartWidget(ChartWidget):
             ("1h", "1\n小\n时", Interval.HOUR),
             ("d", "日\n线", Interval.DAILY),
         ]
-        
+
         # 创建按钮
         for key, label, interval in intervals:
             btn = QtWidgets.QPushButton(label)
@@ -1099,9 +1185,9 @@ class EnhancedChartWidget(ChartWidget):
                 btn.setFixedSize(40, 50)  # 日线只有两个字
             else:
                 btn.setFixedSize(40, 60)
-            
+
             btn.setCheckable(True)
-            
+
             # 设置扁平化按钮样式
             btn.setStyleSheet("""
                 QPushButton {
@@ -1130,51 +1216,53 @@ class EnhancedChartWidget(ChartWidget):
                     border-bottom-right-radius: 3px;
                 }
             """)
-            
+
             # 默认选中1分钟
             if key == "1m":
                 btn.setChecked(True)
-            
+
             # 连接点击事件 - 使用 lambda 确保传递正确的参数
-            btn.clicked.connect(lambda checked, i=interval, b=btn: self._on_interval_changed(i, b))
-            
+            btn.clicked.connect(
+                lambda checked, i=interval, b=btn: self._on_interval_changed(i, b)
+            )
+
             # 保存按钮引用
             self.interval_buttons[key] = btn
-            
+
             panel_layout.addWidget(btn)
-        
+
         # 添加弹簧（用于居中）
         panel_layout.addStretch()
-        
+
         # 设置面板位置和大小
         panel_widget.setFixedWidth(40)  # 只设置按钮宽度
         panel_widget.adjustSize()
-        
+
         self.interval_panel = panel_widget
-        
+
         # 重写resize事件以更新面板位置（垂直居中）
         original_resize = self.resizeEvent
-        
+
         def resize_handler(event):
             if original_resize:
                 original_resize(event)
-            
+
             # 更新周期面板位置（垂直居中，紧贴左边）
-            if hasattr(self, 'interval_panel'):
+            if hasattr(self, "interval_panel"):
                 # 计算垂直居中位置
                 panel_height = self.interval_panel.height()
                 window_height = self.height()
                 y_pos = (window_height - panel_height) // 2
                 self.interval_panel.move(0, max(50, y_pos))  # 紧贴左边，无缝隙
-        
+
         self.resizeEvent = resize_handler
-        
+
         # 初始位置（紧贴左边）
         panel_height = panel_widget.height()
         window_height = self.height()
         y_pos = (window_height - panel_height) // 2
         panel_widget.move(0, max(50, y_pos))  # 紧贴左边，无缝隙
-    
+
     def _on_interval_changed(self, interval, clicked_btn):
         """处理周期切换事件"""
         # 更新当前周期
@@ -1184,7 +1272,7 @@ class EnhancedChartWidget(ChartWidget):
                 "5m": Interval.MINUTE,  # 暂时用MINUTE表示
                 "15m": Interval.MINUTE,
                 "1h": Interval.HOUR,
-                "d": Interval.DAILY
+                "d": Interval.DAILY,
             }
             self.current_interval = interval_map.get(interval, Interval.MINUTE)
             # 保存实际的周期字符串用于聚合
@@ -1192,12 +1280,12 @@ class EnhancedChartWidget(ChartWidget):
         else:
             self.current_interval = interval
             self._actual_interval = interval.value
-        
+
         # 更新按钮状态 - 只保持一个按钮被选中
         # 先取消所有按钮的选中状态
         for btn in self.interval_buttons.values():
             btn.setChecked(False)
-        
+
         # 然后设置当前点击的按钮为选中状态
         if clicked_btn:
             clicked_btn.setChecked(True)
@@ -1209,11 +1297,13 @@ class EnhancedChartWidget(ChartWidget):
                 bars_to_display = self.base_minute_bars
             else:
                 # 聚合数据
-                bars_to_display = self._aggregate_bars(self.base_minute_bars, self._actual_interval)
+                bars_to_display = self._aggregate_bars(
+                    self.base_minute_bars, self._actual_interval
+                )
 
             # 清空所有指标的数据缓存
             for item_name, item in self._items.items():
-                if hasattr(item, 'clear_all'):
+                if hasattr(item, "clear_all"):
                     try:
                         item.clear_all()
                     except Exception:
@@ -1229,9 +1319,9 @@ class EnhancedChartWidget(ChartWidget):
             # 强制更新所有指标
             for item_name, item in self._items.items():
                 try:
-                    if hasattr(item, 'update_history'):
+                    if hasattr(item, "update_history"):
                         item.update_history(bars_to_display)
-                    if hasattr(item, 'update'):
+                    if hasattr(item, "update"):
                         item.update()
                 except Exception:
                     pass  # 静默失败，避免影响整体流程
@@ -1252,7 +1342,9 @@ class EnhancedChartWidget(ChartWidget):
             # 通知外部组件周期已切换
             if self.on_interval_changed_callback:
                 try:
-                    self.on_interval_changed_callback(bars_to_display, self._actual_interval)
+                    self.on_interval_changed_callback(
+                        bars_to_display, self._actual_interval
+                    )
                 except Exception:
                     pass  # 静默失败，避免影响整体流程
 
@@ -1274,7 +1366,7 @@ class EnhancedChartWidget(ChartWidget):
                     xMin=-1,
                     xMax=self._manager.get_count() + 100,  # 允许X轴延伸100个单位
                     yMin=min_value - y_extend,  # 允许Y轴向下扩展
-                    yMax=max_value + y_extend   # 允许Y轴向上扩展
+                    yMax=max_value + y_extend,  # 允许Y轴向上扩展
                 )
 
     def _update_x_range(self) -> None:
