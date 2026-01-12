@@ -75,3 +75,12 @@ Desktop.ini
 *.zip
 articles/
 CLAUDE.md
+
+# 付费指标（不公开）
+core/indicators/adaptive_macd_deluxe_item.py
+core/indicators/enhanced_volume_item.py
+core/indicators/fibonacci_entry_bands_item.py
+core/indicators/smart_money_channels.py
+core/indicators/squeeze_momentum_item.py
+core/indicators/supertrended_rsi_item.py
+core/indicators/wavetrend_item.py

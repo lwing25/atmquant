@@ -81,7 +81,7 @@
 
 ```python
 from vnpy.chart.manager import BarManager
-from core.charts import BollItem, MultiSmaItem, RsiItem
+from core.indicators import BollItem, MultiSmaItem, RsiItem
 
 # 创建BarManager并加载数据
 manager = BarManager()
@@ -192,7 +192,7 @@ python scripts/test_independent_indicators.py
 这些独立指标可以轻松集成到现有的图表系统中：
 
 ```python
-from core.charts import EnhancedChartWidget
+from core.indicators import EnhancedChartWidget
 
 # 如果EnhancedChartWidget可用
 try:
@@ -201,7 +201,7 @@ try:
 except ImportError:
     # 或者直接使用独立指标
     from vnpy.chart.widget import ChartWidget
-    from core.charts import BollItem
+    from core.indicators import BollItem
     
     chart = ChartWidget()
     boll = BollItem(chart._manager)

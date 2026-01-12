@@ -44,7 +44,8 @@ python main.py
 ```
 atmquant/                          # 项目根目录
 ├── 📁 core/                        # 核心业务模块
-│   ├── 📁 charts/                  # 图表相关(定制化图表)
+│   ├── 📁 charts/                  # 图表组件(图表容器和UI组件)
+│   ├── 📁 indicators/              # 技术指标实现(所有技术指标)
 │   ├── 📁 data/                    # 数据处理核心
 │   ├── 📁 logging/                 # 日志和告警系统
 │   │   ├── logger_manager.py      # 日志管理器

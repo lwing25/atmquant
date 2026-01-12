@@ -5,14 +5,14 @@
 包含定制化图表和技术指标的实现
 """
 
-from .indicator_base import ConfigurableIndicator
-from .boll_item import BollItem
-from .multi_sma_item import MultiSmaItem
-from .multi_ema_item import MultiEmaItem
-from .rsi_item import RsiItem
-from .macd_item import Macd3Item
-from .dmi_item import DmiItem
-from .dyna_array_manager import DynaArrayManager
+from core.indicators.indicator_base import ConfigurableIndicator
+from core.indicators.boll_item import BollItem
+from core.indicators.multi_sma_item import MultiSmaItem
+from core.indicators.multi_ema_item import MultiEmaItem
+from core.indicators.rsi_item import RsiItem
+from core.indicators.macd_item import Macd3Item
+from core.indicators.dmi_item import DmiItem
+from core.indicators.dyna_array_manager import DynaArrayManager
 
 # 保持向后兼容
 try:

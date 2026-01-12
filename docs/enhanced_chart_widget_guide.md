@@ -84,7 +84,7 @@ if smart_money_item:
 ### 自定义指标
 
 ```python
-from core.charts import IndicatorConfigurable, ChartItem
+from core.indicators import IndicatorConfigurable, ChartItem
 
 class CustomIndicator(ChartItem, IndicatorConfigurable):
     def __init__(self, manager, param1=10, param2=20):

@@ -29,7 +29,7 @@ from vnpy.chart.widget import ChartCursor
 
 # 优先导入增强版volume指标，如果没有则使用默认版本
 try:
-    from .enhanced_volume_item import EnhancedVolumeItem
+    from core.indicators.enhanced_volume_item import EnhancedVolumeItem
 
     VolumeItem = EnhancedVolumeItem
     VOLUME_CONFIGURABLE = True
@@ -38,13 +38,13 @@ except ImportError:
 
     VOLUME_CONFIGURABLE = False
 
-from .boll_item import BollItem
-from .multi_sma_item import MultiSmaItem
-from .multi_ema_item import MultiEmaItem
-from .rsi_item import RsiItem
-from .macd_item import Macd3Item
-from .dmi_item import DmiItem
-from .indicator_base import ConfigurableIndicator
+from core.indicators.boll_item import BollItem
+from core.indicators.multi_sma_item import MultiSmaItem
+from core.indicators.multi_ema_item import MultiEmaItem
+from core.indicators.rsi_item import RsiItem
+from core.indicators.macd_item import Macd3Item
+from core.indicators.dmi_item import DmiItem
+from core.indicators.indicator_base import ConfigurableIndicator
 
 
 class ExtendableViewBox(pg.ViewBox):
