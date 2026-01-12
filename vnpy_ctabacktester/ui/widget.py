@@ -2254,7 +2254,7 @@ def generate_trade_pairs(trades: list) -> list:
 # 回测管理器 - 选择使用的UI版本
 # ===================================
 
-# 🎉 问题已解决！通过渐进式测试发现 emoji 字符导致 macOS bus error
+# [SOLVED] 问题已解决！通过渐进式测试发现 emoji 字符导致 macOS bus error
 # 已从 RedesignedBacktesterManager 移除所有 emoji，现在使用现代化界面
 
 class BacktesterManager(RedesignedBacktesterManager):
@@ -2262,16 +2262,16 @@ class BacktesterManager(RedesignedBacktesterManager):
     使用重新设计的现代化回测管理器界面
 
     已修复的问题：
-    - ✓ 延迟初始化引擎，避免 Qt + multiprocessing 冲突
-    - ✓ 移除 emoji 字符，避免 macOS 渲染崩溃
+    - [OK] 延迟初始化引擎，避免 Qt + multiprocessing 冲突
+    - [OK] 移除 emoji 字符，避免 macOS 渲染崩溃
     """
     pass
 
 # 渐进式测试指南（已完成诊断，保留供参考）
 #
 # 通过测试 TestVersion1-6，确认了问题根源：
-# - TestVersion1-5：正常 ✓
-# - TestVersion6（添加emoji）：闪退 ✗
+# - TestVersion1-5：正常 [OK]
+# - TestVersion6（添加emoji）：闪退 [FAIL]
 #
 # 结论：emoji 字符在 macOS 上触发 bus error
 # 解决方案：移除所有 emoji，使用纯文本

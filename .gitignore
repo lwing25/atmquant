@@ -76,7 +76,7 @@ Desktop.ini
 articles/
 CLAUDE.md
 
-# 付费指标（不公开）
+# 扩展指标（需额外安装）
 # 默认忽略 core/indicators/ 下所有文件，只保留已追踪的基础指标
 core/indicators/*
 !core/indicators/__init__.py

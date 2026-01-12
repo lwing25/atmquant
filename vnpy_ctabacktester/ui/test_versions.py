@@ -371,11 +371,11 @@ class TestVersion6(TestVersion5):
     """
 
     def init_ui(self) -> None:
-        """初始化界面 - 添加 emoji"""
+        """初始化界面 - 添加 emoji（用于测试emoji导致的崩溃）"""
         super().init_ui()
         self.setWindowTitle("CTA回测 - 测试版本6（含emoji）")
 
-        # 在窗口顶部添加带 emoji 的标签
+        # 在窗口顶部添加带 emoji 的标签（故意保留用于测试）
         if self.layout():
             emoji_label = QtWidgets.QLabel("📊 回测系统 📈")
             emoji_label.setStyleSheet("font-size: 16px; padding: 10px;")

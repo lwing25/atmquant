@@ -27,17 +27,7 @@ from vnpy.chart.base import NORMAL_FONT
 from vnpy.chart.axis import DatetimeAxis
 from vnpy.chart.widget import ChartCursor
 
-# 优先导入增强版volume指标，如果没有则使用默认版本
-try:
-    from core.indicators.enhanced_volume_item import EnhancedVolumeItem
-
-    VolumeItem = EnhancedVolumeItem
-    VOLUME_CONFIGURABLE = True
-except ImportError:
-    from vnpy.chart import VolumeItem
-
-    VOLUME_CONFIGURABLE = False
-
+# ==================== 基础指标（必需，所有用户可用） ====================
 from core.indicators.boll_item import BollItem
 from core.indicators.multi_sma_item import MultiSmaItem
 from core.indicators.multi_ema_item import MultiEmaItem
@@ -45,6 +35,102 @@ from core.indicators.rsi_item import RsiItem
 from core.indicators.macd_item import Macd3Item
 from core.indicators.dmi_item import DmiItem
 from core.indicators.indicator_base import ConfigurableIndicator
+
+# 优先导入增强版volume指标，如果没有则使用默认版本
+try:
+    from core.indicators.enhanced_volume_item import EnhancedVolumeItem
+    VolumeItem = EnhancedVolumeItem
+    VOLUME_CONFIGURABLE = True
+except ImportError:
+    from vnpy.chart import VolumeItem
+    VOLUME_CONFIGURABLE = False
+
+# ==================== 扩展指标（可选，需额外安装） ====================
+# 定义扩展指标的配置信息
+# 格式：指标名称 -> (模块名, 类名, 类型, 默认可见, 高度配置)
+# 类型: "main" 主图指标, "sub" 副图指标
+EXTENDED_INDICATORS_CONFIG = {
+    # 主图指标
+    "fibonacci": {
+        "module": "fibonacci_entry_bands_item",
+        "class": "FibonacciEntryBandsItem",
+        "type": "main",
+        "default_visible": False,
+        "configurable": True,
+    },
+    "smart_money": {
+        "module": "smart_money_channels",
+        "class": "SmartMoneyChannelsItem",
+        "type": "main",
+        "default_visible": False,
+        "configurable": True,
+    },
+    "zlema": {
+        "module": "zlema_item",
+        "class": "ZlemaItem",
+        "type": "main",
+        "default_visible": False,
+        "configurable": True,
+    },
+    "supertrend": {
+        "module": "supertrend_item",
+        "class": "SupertrendItem",
+        "type": "main",
+        "default_visible": False,
+        "configurable": True,
+    },
+    # 副图指标
+    "adaptive_macd": {
+        "module": "adaptive_macd_deluxe_item",
+        "class": "AdaptiveMacdDeluxeItem",
+        "type": "sub",
+        "default_visible": False,
+        "min_height": 120,
+        "max_height": 180,
+        "configurable": True,
+    },
+    "squeeze": {
+        "module": "squeeze_momentum_item",
+        "class": "SqueezeMomentumItem",
+        "type": "sub",
+        "default_visible": False,
+        "min_height": 100,
+        "max_height": 150,
+        "configurable": True,
+    },
+    "supertrended_rsi": {
+        "module": "supertrended_rsi_item",
+        "class": "SupertrendedRsiItem",
+        "type": "sub",
+        "default_visible": False,
+        "min_height": 100,
+        "max_height": 150,
+        "configurable": True,
+    },
+    "wavetrend": {
+        "module": "wavetrend_item",
+        "class": "WaveTrendItem",
+        "type": "sub",
+        "default_visible": False,
+        "min_height": 100,
+        "max_height": 150,
+        "configurable": True,
+    },
+}
+
+# 动态导入扩展指标
+EXTENDED_INDICATORS_CLASSES = {}
+for indicator_name, config in EXTENDED_INDICATORS_CONFIG.items():
+    try:
+        module = __import__(
+            f"core.indicators.{config['module']}",
+            fromlist=[config['class']]
+        )
+        indicator_class = getattr(module, config['class'])
+        EXTENDED_INDICATORS_CLASSES[indicator_name] = indicator_class
+    except (ImportError, AttributeError):
+        # 指标文件不存在或类名不匹配，跳过
+        pass
 
 
 class ExtendableViewBox(pg.ViewBox):
@@ -265,6 +351,7 @@ class EnhancedChartWidget(ChartWidget):
 
     def __init__(self, parent: QtWidgets.QWidget = None):
         # 首先初始化配置，这些在父类初始化之前设置
+        # ==================== 基础指标配置 ====================
         self.main_indicators = {
             "boll": [BollItem, "boll", False, True],
             "sma": [MultiSmaItem, "sma", False, True],
@@ -277,6 +364,29 @@ class EnhancedChartWidget(ChartWidget):
             "rsi": [RsiItem, "rsi", False, 100, 150, True],
             "dmi": [DmiItem, "dmi", True, 100, 150, True],
         }
+
+        # ==================== 自动加载扩展指标 ====================
+        for indicator_name, indicator_class in EXTENDED_INDICATORS_CLASSES.items():
+            config = EXTENDED_INDICATORS_CONFIG[indicator_name]
+
+            if config["type"] == "main":
+                # 主图指标格式: [类, key, 默认可见, 可配置]
+                self.main_indicators[indicator_name] = [
+                    indicator_class,
+                    indicator_name,
+                    config["default_visible"],
+                    config["configurable"],
+                ]
+            elif config["type"] == "sub":
+                # 副图指标格式: [类, key, 默认可见, 最小高度, 最大高度, 可配置]
+                self.sub_indicators[indicator_name] = [
+                    indicator_class,
+                    indicator_name,
+                    config["default_visible"],
+                    config["min_height"],
+                    config["max_height"],
+                    config["configurable"],
+                ]
 
         # 记录指标可见状态
         self.main_indicator_visibility = {
