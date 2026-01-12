@@ -251,6 +251,12 @@ atmquant/                          # 项目根目录
     - 强势信号识别：超买超卖区域的交叉信号成功率更高
     - 智能背离检测：价格与指标背离的自动识别与菱形标记
 
+14. **[量化指标解码14：Supertrended RSI - RSI与趋势跟踪的完美融合](https://mp.weixin.qq.com/s/t1CmDPUXH5r7LgBqvZOr7A)**
+    - RSI+Supertrend融合：在RSI值上计算Supertrend，提供动态支撑阻力
+    - 四种信号类型：超买超卖反转 + 趋势突破确认，过滤逆势假信号
+    - 多重平滑支持：可选HMA平滑RSI，6种MA类型辅助判断趋势
+    - 自适应波动率：基于RSI自身波动计算ATR，动态调整信号敏感度
+
 ---
 
 ## 开发规范

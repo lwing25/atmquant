@@ -1366,16 +1366,20 @@ class CandleChartDialog(QtWidgets.QDialog):
         try:
             from core.charts import EnhancedChartWidget
             self.chart = EnhancedChartWidget()
-        except ImportError:
+        except ImportError as e:
             # 如果增强图表不可用，回退到标准图表
+            print(f"[K线图表] 导入EnhancedChartWidget失败(ImportError): {e}")
+            print("[K线图表] 回退到标准ChartWidget")
             self.chart = ChartWidget()
             self.chart.add_plot("candle", hide_x_axis=True)
             self.chart.add_plot("volume", maximum_height=200)
             self.chart.add_item(CandleItem, "candle", "candle")
             self.chart.add_item(VolumeItem, "volume", "volume")
             self.chart.add_cursor()
-        except Exception:
+        except Exception as e:
             # 捕获其他异常
+            print(f"[K线图表] 加载EnhancedChartWidget失败(Exception): {e}")
+            print("[K线图表] 回退到标准ChartWidget")
             self.chart = ChartWidget()
             self.chart.add_plot("candle", hide_x_axis=True)
             self.chart.add_plot("volume", maximum_height=200)
@@ -1389,6 +1393,10 @@ class CandleChartDialog(QtWidgets.QDialog):
             self.dual_chart = DualChartWidget(left_period="15m", right_period="1h")
             self.dual_chart.hide()  # 默认隐藏
         except ImportError as e:
+            print(f"[K线图表] 导入DualChartWidget失败: {e}")
+            self.dual_chart = None
+        except Exception as e:
+            print(f"[K线图表] 创建DualChartWidget失败: {e}")
             self.dual_chart = None
 
         # 创建四图组件（但默认不显示）
@@ -1402,6 +1410,10 @@ class CandleChartDialog(QtWidgets.QDialog):
             )
             self.quad_chart.hide()  # 默认隐藏
         except ImportError as e:
+            print(f"[K线图表] 导入QuadChartWidget失败: {e}")
+            self.quad_chart = None
+        except Exception as e:
+            print(f"[K线图表] 创建QuadChartWidget失败: {e}")
             self.quad_chart = None
 
         # 创建顶部工具栏

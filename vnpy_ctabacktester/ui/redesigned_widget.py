@@ -68,9 +68,11 @@ class RedesignedBacktesterManager(QtWidgets.QWidget):
 
         self.init_ui()
         self.register_event()
-        # 注释掉：延迟到真正需要时才初始化引擎（避免 Qt + multiprocessing 冲突）
-        # self.backtester_engine.init_engine()
-        # self.init_strategy_settings()
+
+        # 在UI初始化完成后，立即初始化引擎和策略列表（用于填充下拉列表）
+        # 注意：这里只初始化引擎和加载策略名称，不会创建多进程池
+        self.ensure_engine_initialized()
+
         self.load_backtesting_setting()
 
         # 初始化对话框（延迟导入避免循环依赖）
