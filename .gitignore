@@ -47,6 +47,9 @@ logs/
 backtests/results/
 backtests/reports/
 
+# 开发文档（开发过程中产生的临时文档）
+docs/
+
 # IDE
 .vscode/
 .idea/

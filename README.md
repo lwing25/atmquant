@@ -136,7 +136,7 @@ atmquant/                          # 项目根目录
 11. **[以AI量化为生：11.增强版K线图表系统开发实战](https://mp.weixin.qq.com/s/dC1jXfPDsDXumvyOSQQcOw)**
     - 增强版K线图表系统架构设计
     - 主图技术指标实现（布林带、SMA、EMA）
-    - 附图技术指标实现（MACD、RSI、DMI、成交量）
+    - 副图技术指标实现（MACD、RSI、DMI、成交量）
     - 交互控制功能（复选框控制、参数配置、拖拽扩展）
     - 与回测系统无缝集成
 
@@ -257,6 +257,12 @@ atmquant/                          # 项目根目录
     - 四种信号类型：超买超卖反转 + 趋势突破确认，过滤逆势假信号
     - 多重平滑支持：可选HMA平滑RSI，6种MA类型辅助判断趋势
     - 自适应波动率：基于RSI自身波动计算ATR，动态调整信号敏感度
+
+15. **[量化指标解码15：Adaptive MACD Deluxe - 会自己调参的智能MACD](https://mp.weixin.qq.com/s/bvory4baaQTdKPnHpkMatA)**
+    - R²相关性的自适应机制：根据市场状态动态调整MACD灵敏度
+    - Heiken Ashi平滑蜡烛图：把MACD值转成蜡烛图，看趋势更直观
+    - 6种信号平滑选择：EMA、SMA、WMA、VWMA、SMMA、Heiken Ashi
+    - 区域穿越交易信号：极度超买超卖区域的强烈反转信号识别
 
 ---
 

@@ -18,9 +18,10 @@ from core.indicators.dyna_array_manager import DynaArrayManager
 try:
     from .enhanced_chart_widget import (
         EnhancedChartWidget,
-        ExtendableViewBox,
         VolumeItem
     )
+    from .components.extendable_viewbox import ExtendableViewBox
+    from .components.cursor_manager import CursorManager
     _enhanced_available = True
 except ImportError:
     # 如果enhanced_chart_widget有问题，只导出独立指标
@@ -67,6 +68,7 @@ if _enhanced_available:
     __all__.extend([
         "EnhancedChartWidget",
         "ExtendableViewBox",
+        "CursorManager",
         "VolumeItem"
     ])
 
