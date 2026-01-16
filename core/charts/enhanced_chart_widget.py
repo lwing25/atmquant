@@ -377,11 +377,12 @@ class EnhancedChartWidget(ChartWidget):
         layout = QtWidgets.QVBoxLayout(w)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
-        
-        intervals = [("1m", "1\n分\n钟", Interval.MINUTE, 60), ("5m", "5\n分\n钟", "5m", 60),
-                     ("15m", "15\n分\n钟", "15m", 70), ("1h", "1\n小\n时", Interval.HOUR, 60),
+
+        intervals = [("1m", "1\n分\n钟", Interval.MINUTE, 60), ("3m", "3\n分\n钟", "3m", 60),
+                     ("5m", "5\n分\n钟", "5m", 60), ("15m", "15\n分\n钟", "15m", 70),
+                     ("30m", "30\n分\n钟", "30m", 70), ("1h", "1\n小\n时", Interval.HOUR, 60),
                      ("d", "日\n线", Interval.DAILY, 50)]
-        
+
         for key, label, interval, height in intervals:
             btn = QtWidgets.QPushButton(label)
             btn.setFixedSize(40, height)
@@ -396,12 +397,12 @@ class EnhancedChartWidget(ChartWidget):
             btn.clicked.connect(lambda c, i=interval, b=btn: self._on_interval_changed(i, b))
             self.interval_buttons[key] = btn
             layout.addWidget(btn)
-        
+
         layout.addStretch()
         w.setFixedWidth(40)
         w.adjustSize()
         self.interval_panel = w
-        
+
         orig_resize = self.resizeEvent
         def resize_handler(event):
             if orig_resize:
@@ -415,7 +416,7 @@ class EnhancedChartWidget(ChartWidget):
     def _on_interval_changed(self, interval, btn):
         """周期切换"""
         if isinstance(interval, str):
-            self.current_interval = {"5m": Interval.MINUTE, "15m": Interval.MINUTE, "1h": Interval.HOUR, "d": Interval.DAILY}.get(interval, Interval.MINUTE)
+            self.current_interval = {"3m": Interval.MINUTE, "5m": Interval.MINUTE, "15m": Interval.MINUTE, "30m": Interval.MINUTE, "1h": Interval.HOUR, "d": Interval.DAILY}.get(interval, Interval.MINUTE)
             self._actual_interval = interval
         else:
             self.current_interval = interval
@@ -581,6 +582,10 @@ class EnhancedChartWidget(ChartWidget):
         if self._actual_interval == "1m":
             start = last_bar.datetime.replace(second=0, microsecond=0)
             return start, start + timedelta(minutes=1)
+        elif self._actual_interval == "3m":
+            m = (last_bar.datetime.minute // 3) * 3
+            start = last_bar.datetime.replace(minute=m, second=0, microsecond=0)
+            return start, start + timedelta(minutes=3)
         elif self._actual_interval == "5m":
             m = (last_bar.datetime.minute // 5) * 5
             start = last_bar.datetime.replace(minute=m, second=0, microsecond=0)
@@ -589,6 +594,26 @@ class EnhancedChartWidget(ChartWidget):
             m = (last_bar.datetime.minute // 15) * 15
             start = last_bar.datetime.replace(minute=m, second=0, microsecond=0)
             return start, start + timedelta(minutes=15)
+        elif self._actual_interval == "30m":
+            # 半小时K线：如果配置了half_hour_sessions，使用交易时段；否则使用自然30分钟
+            if self.trading_session and self.trading_session.half_hour_sessions:
+                idx = self._get_half_hour_session_index(last_bar.datetime.time())
+                if idx is not None:
+                    sessions = self.trading_session.half_hour_sessions[:]
+                    if self.trading_session.has_night_session and self.trading_session.night_half_hour_sessions:
+                        sessions.extend(self.trading_session.night_half_hour_sessions)
+                    if idx < len(sessions):
+                        s, e = sessions[idx]
+                        start = last_bar.datetime.replace(hour=s.hour, minute=s.minute, second=0, microsecond=0)
+                        end = last_bar.datetime.replace(hour=e.hour, minute=e.minute, second=59, microsecond=999999)
+                        if e < s:
+                            if tick_time.time() <= e: start -= timedelta(days=1)
+                            else: end += timedelta(days=1)
+                        return start, end
+            # 默认使用自然30分钟
+            m = (last_bar.datetime.minute // 30) * 30
+            start = last_bar.datetime.replace(minute=m, second=0, microsecond=0)
+            return start, start + timedelta(minutes=30)
         elif self._actual_interval in ("1h", Interval.HOUR.value):
             if self.trading_session and self.trading_session.hour_sessions:
                 idx = self._get_hour_session_index(last_bar.datetime.time())
@@ -688,10 +713,24 @@ class EnhancedChartWidget(ChartWidget):
         """计算新K线时间"""
         if self._actual_interval == "1m":
             return tick_time.replace(second=0, microsecond=0)
+        elif self._actual_interval == "3m":
+            return tick_time.replace(minute=(tick_time.minute // 3) * 3, second=0, microsecond=0)
         elif self._actual_interval == "5m":
             return tick_time.replace(minute=(tick_time.minute // 5) * 5, second=0, microsecond=0)
         elif self._actual_interval == "15m":
             return tick_time.replace(minute=(tick_time.minute // 15) * 15, second=0, microsecond=0)
+        elif self._actual_interval == "30m":
+            # 半小时K线：如果配置了half_hour_sessions，使用交易时段；否则使用自然30分钟
+            if self.trading_session and self.trading_session.half_hour_sessions:
+                idx = self._get_half_hour_session_index(tick_time.time())
+                if idx is not None:
+                    sessions = self.trading_session.half_hour_sessions[:]
+                    if self.trading_session.has_night_session and self.trading_session.night_half_hour_sessions:
+                        sessions.extend(self.trading_session.night_half_hour_sessions)
+                    if idx < len(sessions):
+                        s, _ = sessions[idx]
+                        return tick_time.replace(hour=s.hour, minute=s.minute, second=0, microsecond=0)
+            return tick_time.replace(minute=(tick_time.minute // 30) * 30, second=0, microsecond=0)
         elif self._actual_interval in ("1h", Interval.HOUR.value):
             if self.trading_session and self.trading_session.hour_sessions:
                 idx = self._get_hour_session_index(tick_time.time())
@@ -728,25 +767,80 @@ class EnhancedChartWidget(ChartWidget):
                         return offset + idx
         return None
 
+    def _get_half_hour_session_index(self, bar_time: time) -> Optional[int]:
+        """获取半小时时段索引"""
+        if not self.trading_session or not self.trading_session.half_hour_sessions:
+            return None
+        for idx, (s, e) in enumerate(self.trading_session.half_hour_sessions):
+            if s <= bar_time <= e:
+                return idx
+        if self.trading_session.has_night_session and self.trading_session.night_half_hour_sessions:
+            offset = len(self.trading_session.half_hour_sessions)
+            for idx, (s, e) in enumerate(self.trading_session.night_half_hour_sessions):
+                if s <= e:
+                    if s <= bar_time <= e:
+                        return offset + idx
+                else:
+                    if bar_time >= s or bar_time <= e:
+                        return offset + idx
+        return None
+
     def _aggregate_bars(self, minute_bars: List[BarData], target_interval) -> List[BarData]:
         """聚合K线"""
         if not minute_bars:
             return []
         interval_str = target_interval.value if isinstance(target_interval, Interval) else target_interval
-        minutes = {"1m": 1, "5m": 5, "15m": 15, "1h": 60, "d": 1440}.get(interval_str, 1)
+        minutes = {"1m": 1, "3m": 3, "5m": 5, "15m": 15, "30m": 30, "1h": 60, "d": 1440}.get(interval_str, 1)
         if minutes == 1:
             return minute_bars
-        
+
         aggregated, current, current_key = [], None, None
         for bar in minute_bars:
             if interval_str == "d":
-                key = bar.datetime.date()
+                # 日线：根据daily_end时间划分交易日
+                if self.trading_session and self.trading_session.daily_end:
+                    daily_end = self.trading_session.daily_end
+                    bar_time = bar.datetime.time()
+
+                    # 判断是否在夜盘时段（夜盘属于下一个交易日）
+                    in_night_session = False
+                    if self.trading_session.has_night_session and self.trading_session.night_sessions:
+                        for night_start, night_end in self.trading_session.night_sessions:
+                            if night_start <= night_end:
+                                # 正常时段（不跨日）
+                                if night_start <= bar_time <= night_end:
+                                    in_night_session = True
+                                    break
+                            else:
+                                # 跨日时段（如23:00-02:00）
+                                if bar_time >= night_start or bar_time <= night_end:
+                                    in_night_session = True
+                                    break
+
+                    # 夜盘属于下一个交易日
+                    if in_night_session:
+                        # 如果是夜盘且在午夜之前，属于下一个交易日
+                        if bar_time > daily_end:
+                            key = bar.datetime.date() + timedelta(days=1)
+                        else:
+                            # 午夜之后的夜盘，已经是下一个自然日，但仍属于当天交易日
+                            key = bar.datetime.date()
+                    else:
+                        # 日盘：正常按当天划分
+                        key = bar.datetime.date()
+                else:
+                    # 默认按自然日划分
+                    key = bar.datetime.date()
             elif interval_str == "1h":
                 idx = self._get_hour_session_index(bar.datetime.time())
                 key = (bar.datetime.date(), f"s{idx}") if idx is not None else (bar.datetime.date(), bar.datetime.hour)
+            elif interval_str == "30m":
+                # 半小时K线：如果配置了half_hour_sessions，使用交易时段合成；否则使用自然30分钟
+                idx = self._get_half_hour_session_index(bar.datetime.time())
+                key = (bar.datetime.date(), f"h{idx}") if idx is not None else (bar.datetime.date(), (bar.datetime.hour * 60 + bar.datetime.minute) // minutes)
             else:
                 key = (bar.datetime.date(), (bar.datetime.hour * 60 + bar.datetime.minute) // minutes)
-            
+
             if current is None:
                 current = BarData(symbol=bar.symbol, exchange=bar.exchange, datetime=bar.datetime,
                     interval=target_interval, open_price=bar.open_price, high_price=bar.high_price,
@@ -767,7 +861,7 @@ class EnhancedChartWidget(ChartWidget):
                 current.volume += bar.volume
                 current.turnover += bar.turnover
                 current.open_interest = bar.open_interest
-        
+
         if current:
             aggregated.append(current)
         return aggregated

@@ -44,34 +44,40 @@ class MarketType(Enum):
 
 class TradingSession:
     """交易时段定义"""
-    
+
     def __init__(
         self,
         name: str,
         hour_sessions: Optional[List[Tuple[time, time]]] = None,
+        half_hour_sessions: Optional[List[Tuple[time, time]]] = None,
         daily_end: time = time(15, 0),
         timezone: str = "Asia/Shanghai",
         has_night_session: bool = False,
-        night_sessions: Optional[List[Tuple[time, time]]] = None
+        night_sessions: Optional[List[Tuple[time, time]]] = None,
+        night_half_hour_sessions: Optional[List[Tuple[time, time]]] = None
     ):
         """
         初始化交易时段
-        
+
         Args:
             name: 市场名称
             hour_sessions: 日盘小时时段列表（用于小时K线聚合）
+            half_hour_sessions: 日盘半小时时段列表（用于半小时K线聚合）
             daily_end: 每日收盘时间
             timezone: 时区
             has_night_session: 是否有夜盘
             night_sessions: 夜盘时段列表
+            night_half_hour_sessions: 夜盘半小时时段列表
         """
         self.name = name
         self.hour_sessions = hour_sessions or []
+        self.half_hour_sessions = half_hour_sessions or []
         self.daily_end = daily_end
         self.timezone = timezone
         self.has_night_session = has_night_session
         self.night_sessions = night_sessions or []
-    
+        self.night_half_hour_sessions = night_half_hour_sessions or []
+
     def __repr__(self):
         return f"TradingSession(name='{self.name}', sessions={len(self.hour_sessions)})"
 
@@ -89,6 +95,17 @@ CN_FUTURES_SESSION = TradingSession(
         (time(11, 15), time(14, 14)),    # 第三小时（跨午休）
         (time(14, 15), time(14, 59))     # 第四小时
     ],
+    half_hour_sessions=[
+        # 日盘半小时时段（考虑10:15-10:30休市和11:30-13:00午休）
+        (time(9, 0), time(9, 29)),       # 第1根：09:00-09:29（30分钟）
+        (time(9, 30), time(9, 59)),      # 第2根：09:30-09:59（30分钟）
+        (time(10, 0), time(10, 44)),     # 第3根：10:00-10:44（45分钟，跨越10:15-10:30休市）
+        (time(10, 45), time(11, 14)),    # 第4根：10:45-11:14（30分钟）
+        (time(11, 15), time(13, 44)),    # 第5根：11:15-13:44（150分钟，跨越11:30-13:00午休，实际交易45分钟）
+        (time(13, 45), time(14, 14)),    # 第6根：13:45-14:14（30分钟）
+        (time(14, 15), time(14, 44)),    # 第7根：14:15-14:44（30分钟）
+        (time(14, 45), time(14, 59))     # 第8根：14:45-14:59（15分钟）
+    ],
     daily_end=time(14, 59),  # 最后一根1分钟K线的时间戳（市场实际收盘时间是15:00）
     timezone="Asia/Shanghai",
     has_night_session=True,
@@ -99,6 +116,20 @@ CN_FUTURES_SESSION = TradingSession(
         (time(0, 0), time(0, 59)),       # 夜盘第4小时（次日）
         (time(1, 0), time(1, 59)),       # 夜盘第5小时
         (time(2, 0), time(2, 29))        # 夜盘第6小时（最后一根K线时间戳是02:29）
+    ],
+    night_half_hour_sessions=[
+        # 夜盘半小时时段（按自然半小时划分）
+        (time(21, 0), time(21, 29)),     # 夜盘第1根
+        (time(21, 30), time(21, 59)),    # 夜盘第2根
+        (time(22, 0), time(22, 29)),     # 夜盘第3根
+        (time(22, 30), time(22, 59)),    # 夜盘第4根
+        (time(23, 0), time(23, 29)),     # 夜盘第5根
+        (time(23, 30), time(23, 59)),    # 夜盘第6根
+        (time(0, 0), time(0, 29)),       # 夜盘第7根（次日）
+        (time(0, 30), time(0, 59)),      # 夜盘第8根
+        (time(1, 0), time(1, 29)),       # 夜盘第9根
+        (time(1, 30), time(1, 59)),      # 夜盘第10根
+        (time(2, 0), time(2, 29))        # 夜盘第11根（最后一根）
     ]
 )
 

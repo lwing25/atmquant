@@ -45,6 +45,12 @@ python main.py
 atmquant/                          # 项目根目录
 ├── 📁 core/                        # 核心业务模块
 │   ├── 📁 charts/                  # 图表组件(图表容器和UI组件)
+│   │   ├── components/            # 图表子组件
+│   │   │   ├── cursor_manager.py  # 光标管理器
+│   │   │   └── extendable_viewbox.py # 可扩展ViewBox
+│   │   ├── enhanced_chart_widget.py # 增强版图表
+│   │   ├── dual_chart_widget.py   # 双图视图
+│   │   └── quad_chart_widget.py   # 四图视图
 │   ├── 📁 indicators/              # 技术指标实现(所有技术指标)
 │   ├── 📁 data/                    # 数据处理核心
 │   ├── 📁 logging/                 # 日志和告警系统
@@ -54,6 +60,9 @@ atmquant/                          # 项目根目录
 ├── 📁 config/                      # 统一配置管理
 │   ├── settings.py                 # 轻量级配置管理
 │   └── alert_config.py             # 告警配置
+├── 📁 vnpy_chartwizard/            # K线图表模块(实时tick更新)
+├── 📁 vnpy_spreadtrading/          # 价差交易模块
+├── 📁 vnpy_tqsdk/                  # 天勤数据源
 ├── 📁 scripts/                     # 运行脚本
 ├── 📁 backtests/                   # 回测相关
 ├── 📁 utils/                       # 工具模块
@@ -167,6 +176,23 @@ atmquant/                          # 项目根目录
     - 重写vnpy基类方法突破边界限制
     - 双击专注模式（主图全屏/副图隔离）
     - 智能状态管理与可见性恢复
+
+17. **[以AI量化为生：17.系统架构优化 - 指标模块化与动态加载](https://mp.weixin.qq.com/s/lfv93wu409ZqwKwQ4xTzQg)**
+    - 目录重构：分离图表和指标
+    - 动态指标加载机制
+    - 扩展指标配置系统
+    - macOS崩溃问题修复
+
+18. **[以AI量化为生：18.实时K线图表系统开发](https://mp.weixin.qq.com/s/aGo0nPybv8PtYDILBX7Efg)**
+    - ChartWizard集成EnhancedChartWidget
+    - 实时价格线显示
+    - 光标x轴标签修复
+    - 图表组件化重构（CursorManager、ExtendableViewBox）
+
+19. **[以AI量化为生：19.半小时K线合成与多周期系统优化](https://mp.weixin.qq.com/s/kcBdo5Skjz1niRrj5RBRHQ)**
+    - 半小时K线特殊时段划分（跨休市合成）
+    - 图表系统3分钟和30分钟周期支持
+    - 日线聚合夜盘处理优化
 
 ---
 

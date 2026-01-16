@@ -180,11 +180,12 @@ class BarGenerator:
         on_window_bar: Callable | None = None,
         interval: Interval = Interval.MINUTE,
         daily_end: time | None = None,
-        hour_sessions: list[tuple[time, time]] | None = None
+        hour_sessions: list[tuple[time, time]] | None = None,
+        half_hour_sessions: list[tuple[time, time]] | None = None
     ) -> None:
         """
         Constructor
-        
+
         Args:
             on_bar: 1分钟K线回调函数
             window: 窗口大小
@@ -194,6 +195,9 @@ class BarGenerator:
             hour_sessions: 小时交易时段列表，格式：[(开始时间, 结束时间), ...]
                           例如：[(time(9, 0), time(9, 59)), (time(10, 0), time(11, 14))]
                           如果为None，则使用默认的自然小时划分
+            half_hour_sessions: 半小时交易时段列表，格式：[(开始时间, 结束时间), ...]
+                               例如：[(time(9, 0), time(9, 29)), (time(9, 30), time(9, 59))]
+                               如果为None，则使用默认的30分钟窗口划分
         """
         self.bar: BarData | None = None
         self.on_bar: Callable = on_bar
@@ -202,6 +206,7 @@ class BarGenerator:
         self.interval_count: int = 0
 
         self.hour_bar: BarData | None = None
+        self.half_hour_bar: BarData | None = None
         self.daily_bar: BarData | None = None
 
         self.window: int = window
@@ -213,10 +218,14 @@ class BarGenerator:
         self.daily_end: time | None = daily_end
         if self.interval == Interval.DAILY and not self.daily_end:
             raise RuntimeError(_("合成日K线必须传入每日收盘时间"))
-        
+
         # 交易时段配置（用于小时K线合成）
         self.hour_sessions = hour_sessions
         self.current_session_index: int | None = None
+
+        # 交易时段配置（用于半小时K线合成）
+        self.half_hour_sessions = half_hour_sessions
+        self.current_half_hour_session_index: int | None = None
 
     def update_tick(self, tick: TickData) -> None:
         """
@@ -281,7 +290,11 @@ class BarGenerator:
         Update 1 minute bar into generator
         """
         if self.interval == Interval.MINUTE:
-            self.update_bar_minute_window(bar)
+            # 如果配置了半小时时段且window=30，使用半小时时段合成逻辑
+            if self.window == 30 and self.half_hour_sessions:
+                self.update_bar_half_hour_window(bar)
+            else:
+                self.update_bar_minute_window(bar)
         elif self.interval == Interval.HOUR:
             self.update_bar_hour_window(bar)
         else:
@@ -529,6 +542,128 @@ class BarGenerator:
                     return i
         
         return None
+
+    def update_bar_half_hour_window(self, bar: BarData) -> None:
+        """
+        更新半小时K线窗口（基于交易时段）
+
+        使用 half_hour_sessions 配置的时段进行合成
+        """
+        bar_time = bar.datetime.time()
+
+        # 查找当前K线所属的交易时段
+        session_index = self._find_half_hour_session_index(bar_time)
+
+        # 如果不在任何交易时段内，忽略该K线
+        if session_index is None:
+            return
+
+        # 判断是否需要生成新的半小时K线
+        need_new_half_hour_bar = False
+
+        # 如果是第一根K线，或者切换到了新的交易时段
+        if not self.half_hour_bar:
+            need_new_half_hour_bar = True
+        elif self.current_half_hour_session_index != session_index:
+            # 切换到新的交易时段，先推送旧的半小时K线
+            finished_bar = self.half_hour_bar
+            self.on_half_hour_bar(finished_bar)
+            need_new_half_hour_bar = True
+        else:
+            # 同一个交易时段内，检查是否到达时段结束时间
+            session_start, session_end = self.half_hour_sessions[session_index]
+            if bar_time >= session_end:
+                # 到达时段结束时间，更新并推送半小时K线
+                self.half_hour_bar.high_price = max(self.half_hour_bar.high_price, bar.high_price)
+                self.half_hour_bar.low_price = min(self.half_hour_bar.low_price, bar.low_price)
+                self.half_hour_bar.close_price = bar.close_price
+                self.half_hour_bar.volume += bar.volume
+                self.half_hour_bar.turnover += bar.turnover
+                self.half_hour_bar.open_interest = bar.open_interest
+
+                finished_bar = self.half_hour_bar
+                self.on_half_hour_bar(finished_bar)
+
+                # 检查是否立即开始下一个时段
+                next_session_index = self._find_half_hour_session_index(bar_time, start_from=session_index + 1)
+                if next_session_index is not None:
+                    need_new_half_hour_bar = True
+                    session_index = next_session_index
+                else:
+                    self.half_hour_bar = None
+                    self.current_half_hour_session_index = None
+                    return
+
+        # 创建新的半小时K线
+        if need_new_half_hour_bar:
+            session_start, session_end = self.half_hour_sessions[session_index]
+            dt = bar.datetime.replace(
+                hour=session_start.hour,
+                minute=session_start.minute,
+                second=0,
+                microsecond=0
+            )
+
+            self.half_hour_bar = BarData(
+                symbol=bar.symbol,
+                exchange=bar.exchange,
+                datetime=dt,
+                gateway_name=bar.gateway_name,
+                open_price=bar.open_price,
+                high_price=bar.high_price,
+                low_price=bar.low_price,
+                close_price=bar.close_price,
+                volume=bar.volume,
+                turnover=bar.turnover,
+                open_interest=bar.open_interest
+            )
+            self.current_half_hour_session_index = session_index
+        else:
+            # 更新现有半小时K线
+            self.half_hour_bar.high_price = max(self.half_hour_bar.high_price, bar.high_price)
+            self.half_hour_bar.low_price = min(self.half_hour_bar.low_price, bar.low_price)
+            self.half_hour_bar.close_price = bar.close_price
+            self.half_hour_bar.volume += bar.volume
+            self.half_hour_bar.turnover += bar.turnover
+            self.half_hour_bar.open_interest = bar.open_interest
+
+    def _find_half_hour_session_index(
+        self,
+        bar_time: time,
+        start_from: int = 0
+    ) -> int | None:
+        """
+        查找给定时间所属的半小时交易时段索引
+
+        Args:
+            bar_time: K线时间
+            start_from: 从哪个索引开始查找
+
+        Returns:
+            交易时段索引，如果不在任何时段内则返回None
+        """
+        if not self.half_hour_sessions:
+            return None
+
+        for i in range(start_from, len(self.half_hour_sessions)):
+            session_start, session_end = self.half_hour_sessions[i]
+
+            # 处理跨日的情况（例如夜盘）
+            if session_start <= session_end:
+                # 正常时段（不跨日）
+                if session_start <= bar_time <= session_end:
+                    return i
+            else:
+                # 跨日时段
+                if bar_time >= session_start or bar_time <= session_end:
+                    return i
+
+        return None
+
+    def on_half_hour_bar(self, bar: BarData) -> None:
+        """半小时K线回调"""
+        if self.on_window_bar:
+            self.on_window_bar(bar)
 
     def on_hour_bar(self, bar: BarData) -> None:
         """"""

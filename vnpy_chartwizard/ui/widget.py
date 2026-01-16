@@ -40,7 +40,7 @@ class ChartWizardWidget(QtWidgets.QWidget):
 
     def init_ui(self) -> None:
         """初始化界面"""
-        self.setWindowTitle("K线图表")
+        self.setWindowTitle("实时K线图表")
 
         self.tab: QtWidgets.QTabWidget = QtWidgets.QTabWidget()
 
