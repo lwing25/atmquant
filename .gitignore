@@ -91,3 +91,16 @@ core/indicators/*
 !core/indicators/rsi_item.py
 !core/indicators/macd_item.py
 !core/indicators/dmi_item.py
+
+# 付费功能模块（ATM Trader Pro 专属）
+vnpy_charttrader/
+core/ai_decision/
+core/ai_clients/
+core/ai_backtester/
+core/models/ai_analysis_data.py
+config/ai_keys_config.py
+config/ai_models_config.py
+config/ai_prompts_config.py
+scripts/run_ai_backtest.py
+scripts/test_ai_backtest.py
+scripts/test_ai_backtest_core.py
