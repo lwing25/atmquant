@@ -564,30 +564,32 @@ class RedesignedBacktesterManager(QtWidgets.QWidget):
         layout = QtWidgets.QVBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
 
-        # 创建两行图表布局
+        # 创建两行两列图表布局
         charts_container = QtWidgets.QWidget()
-        charts_layout = QtWidgets.QVBoxLayout()
+        charts_layout = QtWidgets.QGridLayout()
         charts_layout.setContentsMargins(0, 0, 0, 0)
         charts_layout.setSpacing(2)
 
-        # 第一行图表 - 默认显示账户净值
-        first_row = QtWidgets.QHBoxLayout()
-        first_row.setSpacing(2)
-
+        # 第一行：账户净值、净值回撤
         self.chart1 = ChartWidget("账户净值")
-        
-        first_row.addWidget(self.chart1, 1)
+        self.chart2 = ChartWidget("净值回撤")
 
-        # 第二行图表 - 默认显示每日盈亏
-        second_row = QtWidgets.QHBoxLayout()
-        second_row.setSpacing(2)
+        # 第二行：每日盈亏、滚动夏普比率
+        self.chart3 = ChartWidget("每日盈亏")
+        self.chart4 = ChartWidget("滚动夏普比率")
 
-        self.chart2 = ChartWidget("每日盈亏")
-        
-        second_row.addWidget(self.chart2, 1)
+        # 添加到网格布局，两行两列
+        charts_layout.addWidget(self.chart1, 0, 0)
+        charts_layout.addWidget(self.chart2, 0, 1)
+        charts_layout.addWidget(self.chart3, 1, 0)
+        charts_layout.addWidget(self.chart4, 1, 1)
 
-        charts_layout.addLayout(first_row, 1)
-        charts_layout.addLayout(second_row, 1)
+        # 设置行和列的拉伸因子，保持1:1比例
+        charts_layout.setRowStretch(0, 1)
+        charts_layout.setRowStretch(1, 1)
+        charts_layout.setColumnStretch(0, 1)
+        charts_layout.setColumnStretch(1, 1)
+
         charts_container.setLayout(charts_layout)
 
         layout.addWidget(charts_container)
@@ -850,9 +852,11 @@ class RedesignedBacktesterManager(QtWidgets.QWidget):
         # 获取回测结果数据
         df = self.backtester_engine.get_result_df()
         if df is not None and not df.empty:
-            # 更新各个图表的数据
+            # 更新所有图表的数据
             self.chart1.update_chart_data(df)
             self.chart2.update_chart_data(df)
+            self.chart3.update_chart_data(df)
+            self.chart4.update_chart_data(df)
 
     def start_backtesting(self) -> None:
         """开始回测"""

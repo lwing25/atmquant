@@ -177,7 +177,7 @@ class MysqlDatabase(BaseDatabase):
         
         # 创建所有表
         Base.metadata.create_all(bind=engine)
-        print("MySQL数据库连接成功，表结构已初始化")
+        print("✓ MySQL数据库连接成功，表结构已初始化")
 
     def save_bar_data(self, bars: List[BarData], stream: bool = False) -> bool:
         """保存K线数据"""

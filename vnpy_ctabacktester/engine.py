@@ -1,4 +1,5 @@
 import importlib
+import sys
 import traceback
 from datetime import datetime
 from threading import Thread
@@ -135,10 +136,54 @@ class BacktesterEngine(BaseEngine):
             self.write_log(msg)
 
     def reload_strategy_class(self) -> None:
-        """"""
+        """重载策略类及其依赖的模块
+        
+        自动重载 core.strategies 目录下的所有已加载模块
+        """
+        # 收集所有需要重载的模块
+        modules_to_reload = []
+        
+        # 遍历所有已加载的模块，找出 core.strategies 相关的模块
+        for module_name, module in list(sys.modules.items()):
+            if module_name.startswith('core.strategies'):
+                modules_to_reload.append((module_name, module))
+        
+        # 按模块名称排序，确保基础模块先重载
+        # 优先级：base_mixin > 其他 mixins > unified_base_strategy > 具体策略
+        def get_reload_priority(item):
+            module_name = item[0]
+            if 'base_mixin' in module_name:
+                return 0
+            elif 'mixins' in module_name:
+                return 1
+            elif 'unified_base_strategy' in module_name:
+                return 2
+            else:
+                return 3
+        
+        modules_to_reload.sort(key=get_reload_priority)
+        
+        # 重载所有模块
+        reload_count = 0
+        failed_modules = []
+        for module_name, module in modules_to_reload:
+            try:
+                importlib.reload(module)
+                reload_count += 1
+            except Exception as e:
+                failed_modules.append(f"{module_name}: {str(e)}")
+        
+        # 重载策略类
         self.classes.clear()
         self.load_strategy_class()
-        self.write_log(_("策略文件重载刷新完成"))
+        
+        # 输出汇总信息
+        if failed_modules:
+            self.write_log(_("策略文件重载完成，成功 {} 个，失败 {} 个").format(reload_count, len(failed_modules)))
+            for failed in failed_modules:
+                self.write_log(f"  ✗ {failed}")
+        else:
+            self.write_log(_("策略文件重载完成，共重载 {} 个模块").format(reload_count))
 
     def get_strategy_class_names(self) -> list:
         """"""

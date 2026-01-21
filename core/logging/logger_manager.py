@@ -66,15 +66,22 @@ class LoggerManager:
             
             # 移除默认处理器
             logger.remove()
-            
-            # 设置不同日志级别的颜色
-            logger.level("TRACE", color="<dim>")
-            logger.level("DEBUG", color="<blue>")
-            logger.level("INFO", color="<yellow>")
-            logger.level("SUCCESS", color="<green>")
-            logger.level("WARNING", color="<cyan>")
-            logger.level("ERROR", color="<magenta>")
-            logger.level("CRITICAL", color="<red>")
+
+            # 设置不同日志级别的颜色（优化后的配色方案）
+            # TRACE: 暗灰色（用于最详细的追踪信息）
+            logger.level("TRACE", color="<dim><white>")
+            # DEBUG: 明亮的青色（与终端背景对比度好，易读）
+            logger.level("DEBUG", color="<cyan>")
+            # INFO: 绿色（成功、正常信息）
+            logger.level("INFO", color="<green>")
+            # SUCCESS: 明亮的绿色（重要的成功信息）
+            logger.level("SUCCESS", color="<bold><green>")
+            # WARNING: 黄色（警告信息）
+            logger.level("WARNING", color="<yellow>")
+            # ERROR: 红色（错误信息）
+            logger.level("ERROR", color="<red>")
+            # CRITICAL: 加粗红色（严重错误）
+            logger.level("CRITICAL", color="<bold><red>")
             
             # 添加文件日志处理器，使用优化配置
             file_handler_id = logger.add(
