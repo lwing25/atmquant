@@ -22,6 +22,7 @@
 - 🎮 图表化交易面板（一键下单/平仓、持仓管理）
 - 🤖 AI智能分析系统（多模型分析、信号解读）
 - 📊 高级指标库（SuperTrend、ZLEMA、斐波那契入场带等20+指标）
+- 🔧 无头指标计算器（零Qt依赖，策略专用，支持回测和实盘）
 - 📈 实战策略与代码（含参数优化经验）
 
 👉 加入知识星球：[量策堂·AI算法指标策略](https://t.zsxq.com/Y2m2V)
@@ -220,6 +221,19 @@ atmquant/                          # 项目根目录
     - 风控面板与止损止盈机制
     - 价格预警与快捷键支持
 
+21. **[以AI量化为生：21.交易图表AI分析功能集成](https://mp.weixin.qq.com/s/aPRnBtarPTK4XPncQvkxcg)**
+    - AI分析协调器架构设计
+    - 多模型AI分析集成（Claude/GPT）
+    - 实时指标数据采集系统
+    - AI分析面板UI实现
+    - 信号解读与多周期分析
+
+22. **[以AI量化为生：22.指标计算引擎重构 - 让策略直接复用图表指标](https://mp.weixin.qq.com/s/OslVwmpUgyAggeFhAFHjiw)**
+    - UI耦合问题：指标计算与渲染逻辑混在一起
+    - HeadlessCalculator抽象基类设计
+    - IndicatorManager统一管理多个计算器
+    - 策略中直接使用：零Qt依赖，支持回测/实盘/无UI环境
+
 ---
 
 ### 量化指标解码系列（技术指标研究）
@@ -315,6 +329,36 @@ atmquant/                          # 项目根目录
     - Heiken Ashi平滑蜡烛图：把MACD值转成蜡烛图，看趋势更直观
     - 6种信号平滑选择：EMA、SMA、WMA、VWMA、SMMA、Heiken Ashi
     - 区域穿越交易信号：极度超买超卖区域的强烈反转信号识别
+
+16. **[量化指标解码16：SMC聪明钱概念之订单块](https://mp.weixin.qq.com/s/E7bKW3bjs0klDmb5yEUuhA)**
+    - Smart Money Concept（SMC）核心思想：跟随机构资金而非散户资金
+    - 6种Order Block类型：Demand/Supply的Main ChoCh、Sub ChoCh、BoS
+    - 优先级体系：Main ChoCh > Sub ChoCh > BoS
+    - 实战应用：回踩/反弹入场策略、风险收益比计算、失效判断
+
+17. **[量化指标解码17：SMC聪明钱概念之公允价值缺口](https://mp.weixin.qq.com/s/gruDeLv5o6A1IWJB4SYF5g)**
+    - Fair Value Gap（FVG）本质：价格快速波动留下的未充分成交区域
+    - FVG形成机制：机构大单推动价格时中间价位来不及成交
+    - 三种主要用法：入场区域参考、趋势强度确认、与Order Block协同
+    - 过滤器设计：缺口大小过滤、时间过滤、与Order Block距离过滤
+
+18. **[量化指标解码18：SMC市场结构与流动性](https://mp.weixin.qq.com/s/XEX1E1nUnR4WN4WVGrx9hQ)**
+    - Break of Structure（BoS）：价格突破同方向结构点，趋势延续信号
+    - Change of Character（ChoCh）：价格突破反方向结构点，趋势反转信号
+    - Major vs Minor结构：Major定方向，Minor找时机
+    - 流动性扫荡：双顶双底、三顶三底等经典形态背后的机构操作逻辑
+
+19. **[量化指标解码19：K线形态识别 - 价格行为不会说谎](https://mp.weixin.qq.com/s/F2Pa-zLc7Axub9Zj__b-6A)**
+    - Price Action核心思想：价格包含一切信息，形态反映市场意图
+    - 单K形态识别：锤子线、射击之星、吞没形态、十字星等
+    - 多K组合形态：晨星暮星、三白兵三黑鸦、孕线等
+    - 反转信号与持续信号分类，结合趋势和支撑阻力综合判断
+
+20. **[量化指标解码20：谐波形态识别 - 用斐波那契找到精准反转点](https://mp.weixin.qq.com/s/placeholder-harmonic)**
+    - 谐波形态核心思想：价格运动遵循斐波那契比率关系
+    - 四类形态结构：XABCD五点、OXABCD六点、ABCD四点、三推形态
+    - 11种经典形态：Gartley、Butterfly、Bat、Crab、Shark、Cypher等
+    - ZigZag转向点识别 + 斐波那契比率匹配双重验证
 
 ---
 
