@@ -45,28 +45,35 @@ def main():
         main_engine = MainEngine(event_engine)
         print("✓ 主引擎创建成功")
         
-        # 导入CTP网关
-        from vnpy_ctp import CtpGateway
-        main_engine.add_gateway(CtpGateway)
-        print("✓ CTP交易网关加载成功")
+        # 导入并加载网关
+        try:
+            from vnpy_ctp import CtpGateway
+            main_engine.add_gateway(CtpGateway)
+            print("✓ CTP交易网关加载成功")
+        except (ImportError, Exception) as e:
+            print(f"⚠️  CTP交易网关加载失败 (仅在Windows/Linux且安装了CTP SDK的环境下支持): {e}")
         
         # 导入并添加插件应用
-        from vnpy_ctastrategy import CtaStrategyApp
-        from vnpy_datamanager import DataManagerApp
-        from vnpy_ctabacktester import CtaBacktesterApp
-        from vnpy_chartwizard import ChartWizardApp
+        try:
+            from vnpy_ctastrategy import CtaStrategyApp
+            from vnpy_datamanager import DataManagerApp
+            from vnpy_ctabacktester import CtaBacktesterApp
+            from vnpy_chartwizard import ChartWizardApp
 
-        main_engine.add_app(CtaStrategyApp)
-        print("✓ CTA策略引擎加载成功")
+            main_engine.add_app(CtaStrategyApp)
+            print("✓ CTA策略引擎加载成功")
 
-        #main_engine.add_app(DataManagerApp)
-        #print("✓ 数据管理模块加载成功")
+            main_engine.add_app(CtaBacktesterApp)
+            print("✓ 回测引擎加载成功")
 
-        main_engine.add_app(CtaBacktesterApp)
-        print("✓ 回测引擎加载成功")
-
-        main_engine.add_app(ChartWizardApp)
-        print("✓ K线图表模块加载成功")
+            main_engine.add_app(ChartWizardApp)
+            print("✓ K线图表模块加载成功")
+            
+            # 可以在此处按需添加其他应用，例如 DataManagerApp
+            # main_engine.add_app(DataManagerApp)
+            # print("✓ 数据管理模块加载成功")
+        except ImportError as e:
+            print(f"⚠️  插件应用加载失败: {e}")
         
         # 创建主窗口
         main_window = MainWindow(main_engine, event_engine)

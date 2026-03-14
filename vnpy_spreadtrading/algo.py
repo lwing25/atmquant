@@ -1,3 +1,5 @@
+from __future__ import annotations
+from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from vnpy.trader.constant import Direction

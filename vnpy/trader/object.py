@@ -1,3 +1,5 @@
+from __future__ import annotations
+from __future__ import annotations
 """
 Basic data structure used for general trading function in the trading platform.
 """

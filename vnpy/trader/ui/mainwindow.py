@@ -1,3 +1,5 @@
+from __future__ import annotations
+from __future__ import annotations
 """
 Implements main window of the trading platform.
 """

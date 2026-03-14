@@ -1,3 +1,5 @@
+from __future__ import annotations
+from __future__ import annotations
 """
 增强的回测UI组件
 提供更丰富的回测指标显示和优化结果管理功能
