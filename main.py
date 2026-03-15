@@ -69,9 +69,8 @@ def main():
             main_engine.add_app(ChartWizardApp)
             print("✓ K线图表模块加载成功")
             
-            # 可以在此处按需添加其他应用，例如 DataManagerApp
-            # main_engine.add_app(DataManagerApp)
-            # print("✓ 数据管理模块加载成功")
+            main_engine.add_app(DataManagerApp)
+            print("✓ 数据管理模块加载成功")
         except ImportError as e:
             print(f"⚠️  插件应用加载失败: {e}")
         
