@@ -73,21 +73,28 @@ def get_atmquant_settings() -> Dict[str, Any]:
 
 
 def apply_settings():
-    """应用配置到vnpy.trader.setting.SETTINGS"""
+    """应用配置到vnpy.trader.setting.SETTINGS并同步到磁盘"""
     try:
-        from vnpy.trader.setting import SETTINGS
+        from vnpy.trader.setting import SETTINGS, SETTING_FILENAME
+        from vnpy.trader.utility import save_json
         
         # 获取ATMQuant配置
         atmquant_settings = get_atmquant_settings()
         
-        # 更新vnpy的SETTINGS
+        # 1. 更新内存中的配置
         SETTINGS.update(atmquant_settings)
         
-        print("✓ ATMQuant配置已加载")
+        # 2. 同步到磁盘 vt_setting.json，确保GUI菜单能看到最新值
+        save_json(SETTING_FILENAME, SETTINGS)
+        
+        print("✓ ATMQuant配置已加载并同步到 vt_setting.json")
         return True
         
     except ImportError:
         print("⚠️  VeighNa未安装")
+        return False
+    except Exception as e:
+        print(f"⚠️  同步配置到磁盘失败: {e}")
         return False
 
 
